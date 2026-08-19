@@ -57,3 +57,64 @@ start index.html
   van hetzelfde artikel bij elkaar staan in de export.
 - Printopmaak van de export staat vast op A4 liggend, geschaald naar 1
   pagina breed.
+
+## Roadmap 2.0 — slimme consolidatie (in overleg vastgesteld, nog te bouwen)
+Huidige versie telt alleen *hoeveel* pallets een artikel inneemt. 2.0 moet
+rekening houden met hoe vol/leeg die pallets écht staan, zodat de
+reachtruck-planning gericht kan worden op consolidaties die ook
+daadwerkelijk ruimte opleveren — niet op artikelen die toevallig op 2
+pallets staan maar al bijna vol zijn.
+
+**Vastgestelde aannames (product owner):**
+- Magazijn-specifiek: deze tool wordt maar in 1 magazijn gebruikt, dus
+  locatie-afmetingen wijzigen zelden.
+- Bulklocaties verschillen sterk van afmeting per locatie — geen
+  standaardmaat, dus per Location Code de eigen afmetingen gebruiken.
+- Producten worden vrijwel altijd rechtop opgeslagen — vaste oriëntatie,
+  geen rekening houden met roteren/kantelen van een product.
+- Gewicht is geen harde grens — alleen volume (ruimte) telt mee.
+- Veel producten zitten in een omdoos, maar die afmetingen zijn niet
+  bekend. Bewuste keuze: omdoos negeren bij de berekening, en in plaats
+  daarvan een vaste marge aanhouden op de vulgraad (pallet iets eerder
+  als "vol" beschouwen dan de kale volumeberekening aangeeft).
+- Referentiedata (locatie- en productafmetingen) komt uit een los
+  WMS/ERP-bestand en wordt als vaste bestanden in deze repo gezet (map
+  nog te bepalen, bijv. `data/reference/`) — niet elke sessie opnieuw
+  te uploaden, alleen bijwerken bij wijzigingen.
+- Repo is en blijft public. Voor nu gaat referentiedata gewoon plain
+  (leesbaar) mee in git. Optie om dit later te versleutelen met een
+  wachtwoord (echte encryptie, geen ingebakken sleutel) staat als losse
+  fase op de roadmap, nog niet gebouwd.
+
+**Fase 1 — Referentiedata**
+Locatie-afmetingen en product-afmetingen als vaste bestanden in de repo
+zetten, door de tool ingeladen (geen upload-stap). Nog te checken: is de
+kolom "Quantity" in de voorraadexport altijd in losse eenheden, of soms
+een doos-/verpakkingsaantal? Bepaalt of er een omrekenfactor nodig is.
+
+**Fase 2 — Vulgraad per pallet**
+Per regel: (aantal × productvolume) ÷ locatievolume, min de afgesproken
+marge voor de onbekende omdoos = vulgraad %. Nieuwe kolom in de preview.
+
+**Fase 3 — Consolidatiepotentieel (kern van 2.0)**
+Per artikel op 2+ pallets: totaal benodigd volume afzetten tegen het
+volume van de grootste locatie die het artikel al gebruikt → minimaal
+aantal pallets nodig. Verschil met huidig aantal pallets = aantal
+locaties dat écht vrijgemaakt kan worden. Dit wordt de nieuwe
+prioriteitsscore/sortering, in plaats van alfabetisch.
+
+**Fase 4 — Werklijst voor de reachers**
+Resultaat wordt een prioriteitenlijst (meeste winst bovenaan) i.p.v. een
+platte tabel, met filter/sortering op vulgraad en vrij te maken locaties.
+
+**Fase 5 — Later / optioneel**
+- Wachtwoord-encryptie voor de referentiebestanden in de repo (zie boven).
+- Preciezere volumeberekening (per laag/oriëntatie i.p.v. simpele
+  volumeratio) als de eenvoudige aanpak in de praktijk niet nauwkeurig
+  genoeg blijkt.
+- Duidelijke melding bij artikelen/locaties waarvan afmetingen ontbreken,
+  i.p.v. laten verdwijnen of fout laten rekenen.
+
+**Nog open voordat Fase 1 gebouwd kan worden:** voorbeeld van het
+locatie-afmetingenbestand en het product-afmetingenbestand (kolomnamen,
+eenheden) nog aan te leveren door de product owner.
