@@ -7,6 +7,12 @@ format.
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
 
+**Vervolg dezelfde sessie — veel vollediger productbestand:**
+- Product owner had een opgeschoonde Google Sheet met productdata; op advies (xlsx, sluit aan bij hoe de tool referentiebestanden inleest) geëxporteerd en `data/reference/products.xlsx` mee vervangen (665 KB → 1,55 MB).
+- Gecontroleerd (buiten de browser om, via een PowerShell-uitlezing van de xlsx zelf, want er was geen voorbeeld-voorraadexport meer lokaal aanwezig om de tool end-to-end te draaien): koprij bevat exact de verwachte kolommen (`Product ID`, `Description`, `Product Group`, `Barcode`, `Length`, `Width`, `Height`, `Weight`). 29.996 productregels, geen lege of dubbele Product ID's, en 28.914 daarvan (96%) hebben een volledige, geldige lengte/breedte/hoogte. Dat is een grote sprong t.o.v. de vorige 2.856 producten (waarvan destijds 67% van de artikelen in de resultaten geen match had) — dekking van de vulgraadberekening zou hier flink door moeten verbeteren.
+- Oude bestand (2.856 producten) staat nog gewoon in de git-historie (commit `478246d`) — geen aparte back-up nodig.
+- Nog niet end-to-end getest in de browser met een echte voorraadexport (die stond niet meer lokaal klaar); structuur en volledigheid van het bestand zelf zijn wel bevestigd.
+
 **Vervolg dezelfde sessie — diagnose "alles onbekend":**
 - Product owner testte de live tool: alle regels toonden "onbekend" bij Vulgraad, en vroeg om logging om te zien waarom.
 - Diagnose (met de PowerShell-nabouw van de rekenlogica op de échte bestanden): de eerste `products.xlsx` was een subset van 276 producten uit één productgroep (gevaarlijke stoffen) — de eerste 200 (alfabetisch gesorteerde) resultaatregels waren toevallig allemaal andere producten, dus geen van alle kon gematcht worden. Geen bug, wel onvoldoende dekking.
