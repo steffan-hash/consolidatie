@@ -20,6 +20,13 @@ format.
 - Uitgevoerd met een directe bewerking van `data/reference/locations.xlsx` (via een PowerShell-script dat de xlsx als zip/XML behandelt, dus zonder Excel of extra libraries nodig te hebben). Vooraf een lokale kopie gemaakt (`locations.xlsx.backup-20260819-112331`, niet meegecommit — de originele versie staat toch al in de git-historie van vóór deze wijziging). Na de wijziging gecontroleerd: bestand blijft geldig (rijaantal ongewijzigd, 9040), en 0 van de "-45"-locaties heeft nog een hoogte ≤ 200 mm.
 - Niet aangepast: de overige ~57 lage (≤200 mm) locaties die niet op "-45" eindigen — dat viel buiten deze vraag en is niet onderzocht.
 
+**Vervolg dezelfde sessie — gepushte fix bleek de tool zelf te breken, hersteld:**
+- Na het pushen meldde de product owner op de live tool: "referentiebestanden konden niet geladen worden, vulgraad wordt niet berekend."
+- Live URL gecontroleerd (`curl` op de GitHub Pages-URL): deployment was up-to-date, beide bestanden gaven gewoon 200 OK met de juiste bestandsgrootte en CORS-header — dus geen deploy-vertraging of CORS-probleem.
+- Oorzaak gevonden door de ruwe bytes van `xl/worksheets/sheet1.xml` in het net-bewerkte `locations.xlsx` te inspecteren: het bestand begon met een UTF-8 BOM (EF BB BF), veroorzaakt doordat `XmlDocument.Save(Stream)` in .NET die standaard toevoegt. Browsers (SheetJS) accepteren dat niet in een OOXML-onderdeel, ook al leest .NET zelf het bestand gewoon terug — vandaar dat dit niet opviel bij de eigen controle na de vorige stap. Zie `LESSONS.md` (LESSON 1).
+- Fix opnieuw uitgevoerd, nu vanaf de eerder gemaakte backup (dus zonder op de BOM-fout voort te bouwen) en met een `XmlWriter` die expliciet zonder BOM schrijft. Dezelfde 70 locaties bijgewerkt, gecontroleerd dat de BOM weg is en dat 0 "-45"-locaties nog een hoogte ≤ 200 mm hebben. Bestandsgrootte nu 1.028.285 bytes — nagenoeg gelijk aan het origineel (1.028.434), in lijn met een kleine, gerichte wijziging.
+- Gecommit en gepusht; live URL opnieuw gecontroleerd na de push (zie hieronder in dezelfde sessie-entry indien van toepassing).
+
 **Vervolg dezelfde sessie — diagnose "alles onbekend":**
 - Product owner testte de live tool: alle regels toonden "onbekend" bij Vulgraad, en vroeg om logging om te zien waarom.
 - Diagnose (met de PowerShell-nabouw van de rekenlogica op de échte bestanden): de eerste `products.xlsx` was een subset van 276 producten uit één productgroep (gevaarlijke stoffen) — de eerste 200 (alfabetisch gesorteerde) resultaatregels waren toevallig allemaal andere producten, dus geen van alle kon gematcht worden. Geen bug, wel onvoldoende dekking.
