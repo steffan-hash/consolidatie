@@ -13,6 +13,13 @@ format.
 - Oude bestand (2.856 producten) staat nog gewoon in de git-historie (commit `478246d`) — geen aparte back-up nodig.
 - Nog niet end-to-end getest in de browser met een echte voorraadexport (die stond niet meer lokaal klaar); structuur en volledigheid van het bestand zelf zijn wel bevestigd.
 
+**Vervolg dezelfde sessie — diagnose en fix "-45"-locaties met onbekende vulgraad:**
+- Product owner meldde: bijna alle locaties die eindigen op "-45" (bijv. `16-3-A-136-45`) geven een onbekende vulgraad.
+- Diagnose (via de xlsx-bestanden zelf uitgelezen, buiten de browser om): 70 van de 630 "-45"-locaties in `locations.xlsx` hadden een hoogte van precies 100 mm — steeds exact dezelfde waarde, geen enkele variatie. Na de vaste pallet-hoogte-aftrek van 200 mm (`PALLET_HOOGTE_MM`) wordt de bruikbare hoogte dan 0, vandaar "onbekend" (reden "locatie te laag"). Geen bug in de tool — wel een plausibele datafout in het referentiebestand: 10 cm is geen realistische pallethoogte, en het steeds identieke getal wijst op een placeholder/standaardwaarde in het bron-WMS in plaats van een echte meting.
+- Op verzoek van de product owner opgelost: voor alle 70 betrokken locaties is de hoogte overschreven met de hoogte van de corresponderende "-40"-locatie op dezelfde positie (bijv. `16-3-A-136-45` kreeg de hoogte van `16-3-A-136-40`). Alle 70 hadden een bruikbare "-40"-tegenhanger, geen enkele hoefde overgeslagen te worden, en geen van de bron-"-40"-hoogtes was zelf verdacht laag.
+- Uitgevoerd met een directe bewerking van `data/reference/locations.xlsx` (via een PowerShell-script dat de xlsx als zip/XML behandelt, dus zonder Excel of extra libraries nodig te hebben). Vooraf een lokale kopie gemaakt (`locations.xlsx.backup-20260819-112331`, niet meegecommit — de originele versie staat toch al in de git-historie van vóór deze wijziging). Na de wijziging gecontroleerd: bestand blijft geldig (rijaantal ongewijzigd, 9040), en 0 van de "-45"-locaties heeft nog een hoogte ≤ 200 mm.
+- Niet aangepast: de overige ~57 lage (≤200 mm) locaties die niet op "-45" eindigen — dat viel buiten deze vraag en is niet onderzocht.
+
 **Vervolg dezelfde sessie — diagnose "alles onbekend":**
 - Product owner testte de live tool: alle regels toonden "onbekend" bij Vulgraad, en vroeg om logging om te zien waarom.
 - Diagnose (met de PowerShell-nabouw van de rekenlogica op de échte bestanden): de eerste `products.xlsx` was een subset van 276 producten uit één productgroep (gevaarlijke stoffen) — de eerste 200 (alfabetisch gesorteerde) resultaatregels waren toevallig allemaal andere producten, dus geen van alle kon gematcht worden. Geen bug, wel onvoldoende dekking.
