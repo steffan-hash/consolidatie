@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pallet Consolidatie — WMS voorraad filter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#eef1f6; --card:#ffffff; --border:#e5e7eb; --text:#14161c;
+      --muted:#6b7280; --accent:#f7c948; --accent-dark:#eab627;
+      --ok:#16a34a; --danger:#dc2626; --link:#1f2440;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family:"Poppins","Segoe UI",Arial,sans-serif; margin:0; padding:32px 24px;
+      background:var(--bg); color:var(--text); line-height:1.45;
+    }
+    h1{font-size:1.6rem; font-weight:800; margin:0 0 6px; letter-spacing:-.01em}
+    p.sub{color:var(--muted); font-size:.95rem; margin:0 0 22px}
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:18px;
+      padding:22px 24px; margin-bottom:18px; box-shadow:0 4px 24px rgba(20,22,28,.05);
+    }
+    .card h2{font-size:1.05rem; font-weight:700; margin:0 0 14px}
+    h3{font-size:.9rem; font-weight:700; margin:18px 0 8px}
+    label.field-label{display:block; font-weight:600; font-size:.9rem; margin-bottom:8px}
+    .visually-hidden{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+    label.checkbox{display:flex; align-items:center; gap:10px; cursor:pointer; font-size:.92rem; font-weight:500}
+    label.checkbox input{width:17px; height:17px; accent-color:var(--accent-dark)}
+    .hint{color:var(--muted); font-size:.83rem; margin-top:8px}
+    .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-top:16px}
+    .stat{background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 14px}
+    .stat .num{font-size:1.4rem; font-weight:700}
+    .stat .label{font-size:.78rem; color:var(--muted)}
+
+    button, .btn{
+      background:var(--accent); color:#14161c; border:none; border-radius:14px;
+      padding:13px 20px; font-family:inherit; font-size:.95rem; font-weight:700;
+      cursor:pointer; margin-top:10px; transition:background .15s;
+    }
+    button:hover, .btn:hover{background:var(--accent-dark)}
+    button:disabled{background:#e5e7eb; color:#9ca3af; cursor:not-allowed}
+    #exportBtn{width:100%}
+
+    .file-chip{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:var(--bg); border:1px solid var(--border); border-radius:10px;
+      padding:10px 14px; margin-top:12px; font-size:.85rem; color:var(--text);
+    }
+    .file-chip .chip-remove{
+      background:none; border:none; color:var(--muted); font-size:1.1rem; line-height:1;
+      cursor:pointer; padding:0; margin:0; font-weight:400;
+    }
+    .file-chip .chip-remove:hover{color:var(--danger); background:none}
+
+    textarea, input[type=text]{
+      width:100%; font-family:inherit; font-size:.92rem; color:var(--text);
+      border:1px solid var(--border); border-radius:10px; padding:12px 14px;
+      background:var(--card);
+    }
+    textarea:focus, input[type=text]:focus{outline:2px solid var(--accent); outline-offset:1px}
+
+    #previewWrap{max-height:420px; overflow:auto; border:1px solid var(--border); border-radius:12px; margin-top:14px}
+    table{border-collapse:collapse; width:100%; font-size:.82rem}
+    th,td{border-bottom:1px solid var(--border); padding:7px 10px; text-align:left; white-space:nowrap}
+    thead th{position:sticky; top:0; background:#f7f8fa; font-weight:700; z-index:1}
+
+    #errorBox{display:none; background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; padding:12px 16px; border-radius:12px; margin-bottom:16px; font-size:.9rem}
+    #status{display:none; color:var(--muted); font-size:.85rem; margin-bottom:4px}
+    #successText{color:var(--ok); font-size:.85rem; font-weight:600; margin-top:6px}
+
+    .quicklinks{display:flex; gap:16px; margin-bottom:10px}
+    .quicklinks a{font-size:.83rem; color:var(--link); font-weight:600; cursor:pointer; text-decoration:none}
+    .quicklinks a:hover{text-decoration:underline}
+    #productGroupList{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px 12px; max-height:220px; overflow:auto; padding:4px 0}
+    #productGroupList label{display:flex; align-items:center; gap:7px; font-size:.85rem; font-weight:500; cursor:pointer}
+    #productGroupList input{width:15px; height:15px; accent-color:var(--accent-dark)}
+
+    .inbox-link{display:inline-block; margin-top:4px; color:var(--link); font-weight:700; font-size:.9rem; text-decoration:none}
+    .inbox-link:hover{text-decoration:underline}
+  </style>
+  <!-- SheetJS: leest het .xlsx bestand in de browser -->
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- ExcelJS: schrijft het resultaat weg met opmaak (vetgedrukte koprij, filterknoppen) -->
+  <script src="https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"></script>
+</head>
+<body>
+  <h1>Pallet Consolidatie</h1>
+  <p class="sub">Filter de WMS-voorraadexport op artikelen die verspreid staan over meerdere pallets op bulklocaties.</p>
+
+  <div id="errorBox"></div>
+
+  <div class="card">
+    <h2>1. Voorraadbestand uploaden</h2>
+    <label class="field-label" for="pickFileBtn">Voorraadbestand (.xlsx)</label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" class="visually-hidden" />
+    <button type="button" id="pickFileBtn" class="btn">Bestand kiezen</button>
+    <div class="hint">Upload de .xlsx export vanuit het WMS (zoals geëxporteerd via Gmail).</div>
+    <div id="fileChip" class="file-chip" style="display:none">
+      <span id="fileChipName"></span>
+      <button type="button" id="removeFileBtn" class="chip-remove" aria-label="Verwijder bestand">×</button>
+    </div>
+  </div>
+
+  <div class="card" id="filterCard" style="display:none">
+    <h2>2. Filter</h2>
+    <label class="checkbox">
+      <input type="checkbox" id="hideSinglePallet" checked />
+      Verberg artikelen die maar op 1 pallet staan (alleen consolidatie-kandidaten tonen)
+    </label>
+    <div class="hint">
+      Alleen "Bulk Location" wordt meegeteld als pallet-locatie. "Bulk Location Extern" en
+      pick-locaties tellen niet mee, want die pallets kun je niet fysiek samenvoegen met de rest.
+    </div>
+
+    <div class="stats" id="statsBox"></div>
+
+    <div id="productGroupSection" style="display:none">
+      <h3>Product Group</h3>
+      <div class="quicklinks">
+        <a id="selectAllGroups">Alles selecteren</a>
+        <a id="selectNoneGroups">Alles deselecteren</a>
+      </div>
+      <div id="productGroupList"></div>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h2>3. Resultaat</h2>
+    <div id="status"></div>
+    <div id="previewWrap"><table id="previewTable"></table></div>
+    <button id="exportBtn">Download resultaat als .xlsx</button>
+  </div>
+
+  <script src="scripts/script.js"></script>
+</body>
+</html>

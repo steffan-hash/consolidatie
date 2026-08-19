@@ -18,4 +18,8 @@ node_modules/
 .vscode/
 .idea/
 
-# Lokale data (indien van toepassing per project — pas aan in PROJECT.md context)
+# Lokale data — WMS-exports zijn bedrijfsdata en horen niet op GitHub
+data/input/*
+data/output/*
+!data/input/.gitkeep
+!data/output/.gitkeep
