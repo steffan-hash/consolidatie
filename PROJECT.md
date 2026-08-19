@@ -106,11 +106,30 @@ openen door dubbelklikken op `index.html`. Voor lokaal testen is een
 kleine lokale server nodig.
 
 **Fase 2 — Vulgraad per pallet (gebouwd)**
-Per regel: (aantal × productvolume) ÷ (locatievolume × (1 − 15% marge
-voor de onbekende omdoos)) = vulgraad %. Zichtbaar als kolom in de
-preview én in het geëxporteerde .xlsx-bestand. Stats tonen ook voor
-hoeveel regels de vulgraad bekend is (dekking hangt af van hoeveel van
-`products.xlsx` gevuld is).
+Per regel: (aantal × productvolume) ÷ (bruikbare locatie-inhoud) =
+vulgraad %. Bruikbare locatie-inhoud = locatielengte × locatiebreedte ×
+(locatiehoogte − 200 mm voor de europallet zelf) × (1 − 15% marge voor de
+onbekende omdoos). Beide getallen (200 mm, 15%) zijn een inschatting, geen
+gemeten waarde — staan als `PALLET_HOOGTE_MM` en `OMDOOS_MARGE` bovenaan
+`scripts/script.js` en zijn daar aan te passen als de praktijk daar
+aanleiding toe geeft.
+
+Zichtbaar als kolom in de preview én in het geëxporteerde .xlsx-bestand.
+De statistieken splitsen "onbekend" uit naar reden (product niet in
+`products.xlsx`, locatie niet in `locations.xlsx`, ongeldig aantal, of
+locatie te laag na de pallet-aftrek) — zo is in de tool zelf te zien
+wáárom iets onbekend is, zonder de browserconsole nodig te hebben.
+(Extra: bij het laden logt de tool ook een samenvatting in de
+browserconsole (F12 → Console), voor verdere diagnose.)
+
+Dekking hangt volledig af van hoe compleet `products.xlsx` is. Bij de
+eerste test (276 producten, een subset) was vrijwel alles "onbekend".
+Na een volledigere export (2856 producten) is dat gemeten op de
+voorbeelddata: ~30% van de resultaatregels bekend, en van de unieke
+artikelen in het resultaat stond nog 67% niet in `products.xlsx` — dat is
+dus een dekkingsvraagstuk in het bronbestand, geen bug in de tool. Als de
+dekking omhoog moet, is een vollediger productbestand (zonder filter op
+bijv. "actief") de aangewezen oplossing.
 
 **Fase 3 — Consolidatiepotentieel (kern van 2.0)**
 Per artikel op 2+ pallets: totaal benodigd volume afzetten tegen het

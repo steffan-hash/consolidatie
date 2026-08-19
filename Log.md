@@ -5,7 +5,15 @@ owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
 ## Sessie 2026-08-19
-**Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd en getest. Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
+**Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
+
+**Vervolg dezelfde sessie — diagnose "alles onbekend":**
+- Product owner testte de live tool: alle regels toonden "onbekend" bij Vulgraad, en vroeg om logging om te zien waarom.
+- Diagnose (met de PowerShell-nabouw van de rekenlogica op de échte bestanden): de eerste `products.xlsx` was een subset van 276 producten uit één productgroep (gevaarlijke stoffen) — de eerste 200 (alfabetisch gesorteerde) resultaatregels waren toevallig allemaal andere producten, dus geen van alle kon gematcht worden. Geen bug, wel onvoldoende dekking.
+- Product owner leverde een vollediger `products.xlsx` aan (2856 producten). Daarmee: 1823 van 5983 resultaatregels (~30%) hebben nu een bekende vulgraad. Van de 933 unieke artikelen in het resultaat staat 67% (621) nog steeds niet in `products.xlsx` — puur een dekkingsvraagstuk in het bronbestand (0 gevallen van een matchend product zonder afmetingen, dus geen normalisatieprobleem in de koppeling zelf).
+- `scripts/script.js` uitgebreid met reden-codes voor "onbekend" (`product-onbekend`, `locatie-onbekend`, `aantal-ongeldig`, `locatie-te-laag`, `referentiedata-niet-geladen`) — nu zichtbaar als uitsplitsing in de statistieken, plus een samenvatting in de browserconsole bij het laden. Zo is voortaan in de tool zelf te zien wáárom een regel onbekend is, zonder devtools nodig te hebben.
+- Op verzoek: locatiehoogte wordt nu eerst met 200 mm verminderd (`PALLET_HOOGTE_MM`) voor de vulgraadberekening, om ruimte voor de europallet zelf mee te rekenen. Marge voor de onbekende omdoos blijft 15% (`OMDOOS_MARGE`) — beide instelbaar bovenaan `scripts/script.js`, gedocumenteerd in `PROJECT.md`.
+- Opnieuw getest in een echte (headless) browser: geen JS-fouten, referentiedata laadt en de consolelog toont exact dezelfde aantallen als de PowerShell-controle (2855/2856 producten, 9039/9039 locaties).
 **Wat gedaan:**
 - `index.html`, `scripts/script.js` en een voorbeeldbestand (`data/input/Stock (6).xlsx`) overgezet vanuit een los mapje op het bureaublad (`Desktop/Consalidatie`) waar de tool tot nu toe buiten git om gebouwd was.
 - `.gitignore` uitgebreid: `data/input/` en `data/output/` worden genegeerd (met `.gitkeep`), want WMS-voorraadexports zijn bedrijfsdata en horen niet op GitHub.
@@ -17,10 +25,9 @@ format.
 - Getest: de vulgraad-formule losstaand nagebouwd in PowerShell op de échte data (via de xlsx-bestanden zelf uitgelezen) — resultaten zijn plausibel (1–50% in de steekproef, geen negatieve/absurde waarden). Daarnaast in een echte (headless) browser bevestigd dat `script.js` foutloos laadt en de referentiebestanden succesvol ophaalt en verwerkt via dezelfde CDN-libraries als de tool zelf gebruikt.
 **Nog open:**
 - Fase 3 van de roadmap (prioriteitsscore: hoeveel locaties een consolidatie daadwerkelijk vrijmaakt) is nog niet gebouwd.
-- De volledige upload-en-bekijk-flow (bestand kiezen → Vulgraad-kolom zien in de preview) is nog niet door een mens in een browser gecontroleerd — wel de onderliggende berekening en het laden van de referentiedata. Aanrader: eenmaal zelf de live GitHub Pages-versie proberen met een voorraadbestand.
+- Dekking van `products.xlsx` is nu ~30% van de resultaatregels (67% van de unieke artikelen mist nog een match). Als hogere dekking gewenst is: een vollediger productbestand aanleveren (mogelijk zit er een "actief"-filter op de huidige export).
 - Het oude mapje `Desktop/Consalidatie` staat nog op het bureaublad (incl. een oudere, afwijkende `CLAUDE.md`). Niet verwijderd — graag zelf beoordelen of dat weg kan.
-- Dekking van de vulgraad is nu laag (`products.xlsx` is een subset) — dat is verwacht gedrag, geen bug, maar goed om te weten bij het beoordelen van de eerste resultaten.
-**Volgende stap:** Zelf de nieuwe Vulgraad-kolom checken via GitHub Pages, dan (als de marge/aanpak logisch aanvoelt) Fase 3 bouwen: sorteren op daadwerkelijk vrij te maken locaties i.p.v. alfabetisch.
+**Volgende stap:** Zelf de bijgewerkte statistieken-uitsplitsing checken via GitHub Pages. Als de aanpak (200 mm pallet-aftrek, 15% omdoos-marge) logisch aanvoelt: Fase 3 bouwen (sorteren op daadwerkelijk vrij te maken locaties i.p.v. alfabetisch).
 
 <!--
 Voorbeeld van een entry:

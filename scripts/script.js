@@ -75,8 +75,16 @@
   // De productafmetingen zijn van het kale product, niet van de omdoos
   // waarin het op de pallet ligt (die afmetingen zijn niet bekend). Om te
   // voorkomen dat de vulgraad daardoor te optimistisch wordt ingeschat, telt
-  // dit percentage van de locatie-inhoud niet mee als bruikbare ruimte.
+  // dit percentage van de locatie-inhoud niet mee als bruikbare ruimte. Dit
+  // is een inschatting (geen gemeten waarde) — bijstellen kan door dit getal
+  // aan te passen als de praktijk daar aanleiding toe geeft.
   const OMDOOS_MARGE = 0.15;
+
+  // De locatiehoogte uit het referentiebestand is de hoogte van de hele
+  // opslaglocatie, maar de producten staan op een europallet die zelf ook
+  // hoogte inneemt. Dit aantal mm gaat van de locatiehoogte af voordat de
+  // vulgraad berekend wordt, want dat is geen ruimte voor het product zelf.
+  const PALLET_HOOGTE_MM = 200;
 
   // Vaste set kolommen voor het resultaat — niet instelbaar in de UI. De rest
   // van de brondata is ruis voor het consolideren van pallets.
@@ -194,6 +202,12 @@
       productDimsById = buildDimsMap(products, 'product id');
       locationDimsByCode = buildDimsMap(locations, 'location');
       referenceDataReady = true;
+      // Zichtbaar in de browserconsole (F12) zodat te zien is hoeveel van de
+      // referentiebestanden daadwerkelijk bruikbare afmetingen bevatten.
+      console.info(
+        `Referentiedata geladen: producten ${productDimsById.size}/${products.length} met afmetingen, ` +
+        `locaties ${locationDimsByCode.size}/${locations.length} met afmetingen.`
+      );
     } catch (e) {
       console.warn('Referentiedata (locatie-/productafmetingen) kon niet geladen worden — vulgraad wordt niet berekend.', e);
       referenceDataReady = false;
@@ -204,21 +218,28 @@
   loadReferenceData();
 
   // Vulgraad van 1 regel: hoeveel % van de bruikbare locatie-inhoud is bezet
-  // door de hoeveelheid van dit product. null als afmetingen ontbreken of de
-  // referentiedata niet geladen kon worden — dan is er niets over te zeggen.
+  // door de hoeveelheid van dit product. Geeft altijd een reden mee als het
+  // niet lukt, zodat in de statistieken zichtbaar is WAAROM iets "onbekend"
+  // is (referentiedata niet geladen, product/locatie niet in het
+  // referentiebestand, geen geldig aantal, of locatie te laag).
   function computeFillRatio(row, productHeader, locationHeader, quantityHeader) {
-    if (!referenceDataReady) return null;
+    if (!referenceDataReady) return { ratio: null, reason: 'referentiedata-niet-geladen' };
+
     const product = productDimsById.get(normKey(row[productHeader]));
+    if (!product) return { ratio: null, reason: 'product-onbekend' };
+
     const location = locationDimsByCode.get(normKey(row[locationHeader]));
-    if (!product || !location) return null;
+    if (!location) return { ratio: null, reason: 'locatie-onbekend' };
+
     const qty = Number(row[quantityHeader]);
-    if (!qty || qty <= 0) return null;
+    if (!qty || qty <= 0) return { ratio: null, reason: 'aantal-ongeldig' };
 
     const productVolume = product.length * product.width * product.height;
-    const usableLocationVolume = location.length * location.width * location.height * (1 - OMDOOS_MARGE);
-    if (usableLocationVolume <= 0) return null;
+    const usableHeight = Math.max(location.height - PALLET_HOOGTE_MM, 0);
+    const usableLocationVolume = location.length * location.width * usableHeight * (1 - OMDOOS_MARGE);
+    if (usableLocationVolume <= 0) return { ratio: null, reason: 'locatie-te-laag' };
 
-    return (productVolume * qty) / usableLocationVolume;
+    return { ratio: (productVolume * qty) / usableLocationVolume, reason: 'ok' };
   }
 
   function resetUI() {
@@ -395,7 +416,7 @@
     // Vulgraad per regel opnieuw berekenen (bijv. nodig als de referentie-
     // data pas na het inladen van de voorraad binnenkomt).
     resultRows.forEach(row => {
-      row.__fillRatio = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
+      row.__fillInfo = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
     });
 
     renderStats();
@@ -419,16 +440,35 @@
       { label: 'Regels in huidig resultaat', num: resultRows.length },
     ];
 
-    // Vulgraad is alleen zinvol om te tonen als de referentiedata geladen is.
-    if (referenceDataReady) {
-      const known = resultRows.filter(r => r.__fillRatio !== null);
-      const avgFill = known.length
-        ? known.reduce((sum, r) => sum + r.__fillRatio, 0) / known.length
-        : 0;
-      stats.push({ label: 'Vulgraad bekend (van huidig resultaat)', num: `${known.length} / ${resultRows.length}` });
-      if (known.length) {
+    // Vulgraad-dekking uitsplitsen naar reden, zodat in de statistieken
+    // zelf te zien is WAAROM regels "onbekend" zijn — zonder devtools nodig
+    // te hebben. Reden 'ok' = vulgraad kon berekend worden.
+    if (!referenceDataReady) {
+      stats.push({ label: 'Vulgraad', num: 'referentiebestanden niet geladen' });
+    } else {
+      const reasonCounts = {};
+      resultRows.forEach(r => {
+        reasonCounts[r.__fillInfo.reason] = (reasonCounts[r.__fillInfo.reason] || 0) + 1;
+      });
+      const known = reasonCounts['ok'] || 0;
+      stats.push({ label: 'Vulgraad bekend (van huidig resultaat)', num: `${known} / ${resultRows.length}` });
+      if (known) {
+        const avgFill = resultRows
+          .filter(r => r.__fillInfo.reason === 'ok')
+          .reduce((sum, r) => sum + r.__fillInfo.ratio, 0) / known;
         stats.push({ label: 'Gemiddelde vulgraad (bekend)', num: `${Math.round(avgFill * 100)}%` });
       }
+      const REASON_LABELS = {
+        'product-onbekend': 'Waarvan: productafmetingen niet in referentiebestand',
+        'locatie-onbekend': 'Waarvan: locatieafmetingen niet in referentiebestand',
+        'aantal-ongeldig': 'Waarvan: aantal ontbreekt/ongeldig',
+        'locatie-te-laag': 'Waarvan: locatie te laag na pallet-aftrek',
+      };
+      Object.keys(REASON_LABELS).forEach(reasonKey => {
+        if (reasonCounts[reasonKey]) {
+          stats.push({ label: REASON_LABELS[reasonKey], num: reasonCounts[reasonKey] });
+        }
+      });
     }
 
     statsBox.innerHTML = stats.map(s =>
@@ -438,9 +478,9 @@
 
   // Vulgraad als leesbare tekst voor tabel/export: percentage, of "onbekend"
   // als afmetingen van product of locatie ontbreken.
-  function formatFillRatio(ratio) {
-    if (ratio === null || ratio === undefined) return 'onbekend';
-    return `${Math.round(ratio * 100)}%`;
+  function formatFillRatio(fillInfo) {
+    if (!fillInfo || fillInfo.ratio === null || fillInfo.ratio === undefined) return 'onbekend';
+    return `${Math.round(fillInfo.ratio * 100)}%`;
   }
 
   function renderPreview() {
@@ -458,7 +498,7 @@
         const val = c.header ? row[c.header] : '';
         return `<td>${val === undefined || val === null ? '' : String(val)}</td>`;
       });
-      if (showFillColumn) cells.push(`<td>${formatFillRatio(row.__fillRatio)}</td>`);
+      if (showFillColumn) cells.push(`<td>${formatFillRatio(row.__fillInfo)}</td>`);
       return '<tr>' + cells.join('') + '</tr>';
     }).join('');
     previewTable.innerHTML = thead + '<tbody>' + bodyRows + '</tbody>';
@@ -479,7 +519,7 @@
         referenceDataReady ? [{ label: 'Vulgraad', header: null, isFillColumn: true }] : []
       );
       const valueFor = (row, c) => c.isFillColumn
-        ? formatFillRatio(row.__fillRatio)
+        ? formatFillRatio(row.__fillInfo)
         : (c.header ? row[c.header] : '');
 
       // Kolombreedte: Location Code/Quantity/Urn/Vulgraad krijgen net genoeg
