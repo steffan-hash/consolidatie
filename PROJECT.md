@@ -37,6 +37,10 @@ start index.html
 - Voorbeeldbestand staat in `data/input/` voor lokaal testen. Deze map en
   `data/output/` zijn gitignored — WMS-exports zijn bedrijfsdata en horen
   niet op GitHub.
+- `data/reference/products.xlsx` en `data/reference/locations.xlsx`: vaste
+  referentiebestanden voor de vulgraadberekening (zie Roadmap 2.0
+  hieronder). Deze staan wél gewoon in git (bewuste keuze, zie Roadmap).
+  Bij een nieuwe export: bestand met dezelfde naam vervangen.
 
 ## Conventies
 - Scripts in `scripts/`
@@ -58,7 +62,7 @@ start index.html
 - Printopmaak van de export staat vast op A4 liggend, geschaald naar 1
   pagina breed.
 
-## Roadmap 2.0 — slimme consolidatie (in overleg vastgesteld, nog te bouwen)
+## Roadmap 2.0 — slimme consolidatie
 Huidige versie telt alleen *hoeveel* pallets een artikel inneemt. 2.0 moet
 rekening houden met hoe vol/leeg die pallets écht staan, zodat de
 reachtruck-planning gericht kan worden op consolidaties die ook
@@ -86,15 +90,27 @@ pallets staan maar al bijna vol zijn.
   wachtwoord (echte encryptie, geen ingebakken sleutel) staat als losse
   fase op de roadmap, nog niet gebouwd.
 
-**Fase 1 — Referentiedata**
-Locatie-afmetingen en product-afmetingen als vaste bestanden in de repo
-zetten, door de tool ingeladen (geen upload-stap). Nog te checken: is de
-kolom "Quantity" in de voorraadexport altijd in losse eenheden, of soms
-een doos-/verpakkingsaantal? Bepaalt of er een omrekenfactor nodig is.
+**Fase 1 — Referentiedata (gebouwd)**
+`data/reference/products.xlsx` en `data/reference/locations.xlsx` staan
+vast in de repo en worden door de tool zelf ingeladen (fetch, geen
+upload-stap). Koppelveld producten: `Product ID` ↔ `Product` in de
+voorraadexport. Koppelveld locaties: `Location` ↔ `Location Code`.
+Bevestigd: `Quantity` in de voorraadexport is altijd losse eenheden,
+rechtstreeks te vermenigvuldigen met de productafmetingen (geen
+dozen/verpakkingsfactor nodig). `products.xlsx` is bewust een subset
+(niet elk product staat erin) — ontbrekende afmetingen geven "onbekend",
+geen foutmelding of gok.
+Let op: fetch() van deze bestanden werkt alleen als de pagina via een
+webserver bediend wordt (dus via de GitHub Pages-URL), niet bij lokaal
+openen door dubbelklikken op `index.html`. Voor lokaal testen is een
+kleine lokale server nodig.
 
-**Fase 2 — Vulgraad per pallet**
-Per regel: (aantal × productvolume) ÷ locatievolume, min de afgesproken
-marge voor de onbekende omdoos = vulgraad %. Nieuwe kolom in de preview.
+**Fase 2 — Vulgraad per pallet (gebouwd)**
+Per regel: (aantal × productvolume) ÷ (locatievolume × (1 − 15% marge
+voor de onbekende omdoos)) = vulgraad %. Zichtbaar als kolom in de
+preview én in het geëxporteerde .xlsx-bestand. Stats tonen ook voor
+hoeveel regels de vulgraad bekend is (dekking hangt af van hoeveel van
+`products.xlsx` gevuld is).
 
 **Fase 3 — Consolidatiepotentieel (kern van 2.0)**
 Per artikel op 2+ pallets: totaal benodigd volume afzetten tegen het

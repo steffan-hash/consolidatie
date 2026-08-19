@@ -18,12 +18,23 @@
 
   Output: Een nieuw .xlsx bestand dat gedownload wordt
           (rapportage_consolidatie_pallets_YYYY-MM-DD.xlsx). Het resultaat
-          bevat vast (geen instelbare optie) maar 4 kolommen: Location Code,
-          Product Name (= Description uit het bronbestand), Quantity en Urn
-          — de rest van de brondata is niet nodig om pallets te vinden en
-          fysiek te consolideren. Printopmaak staat op A4 liggend, geschaald
-          naar 1 pagina breed, met Product Name zo breed als de andere
-          kolommen toelaten.
+          bevat de 4 vaste kolommen (Location Code, Product Name, Quantity,
+          Urn) plus een berekende kolom Vulgraad — de rest van de brondata
+          is niet nodig om pallets te vinden en fysiek te consolideren.
+          Printopmaak staat op A4 liggend, geschaald naar 1 pagina breed,
+          met Product Name zo breed als de andere kolommen toelaten.
+
+  Vulgraad (2.0): naast de voorraadexport laadt de tool automatisch twee
+          vaste referentiebestanden uit data/reference/ (products.xlsx en
+          locations.xlsx, met Length/Width/Height in mm) om te berekenen
+          hoeveel % van een locatie daadwerkelijk bezet is. Dit zijn géén
+          uploads — de bestanden staan vast in de repo en worden zelden
+          bijgewerkt. Ontbreken afmetingen van een product of locatie, dan
+          wordt de vulgraad "onbekend" i.p.v. dat er iets geraden wordt.
+          Omdozen worden genegeerd (afmetingen daarvan zijn niet bekend);
+          om te voorkomen dat de vulgraad daardoor te optimistisch wordt,
+          telt een vast percentage van de locatie-inhoud (OMDOOS_MARGE)
+          niet mee.
 */
 
 (function () {
@@ -44,12 +55,28 @@
   const statusEl = document.getElementById('status');
   const previewTable = document.getElementById('previewTable');
   const exportBtn = document.getElementById('exportBtn');
+  const refDataHint = document.getElementById('refDataHint');
 
   // Kolomnamen die we nodig hebben om het bestand te kunnen interpreteren.
   // Vergelijking gebeurt case-insensitive en na trimmen van spaties, zodat
   // kleine verschillen tussen exports geen probleem zijn.
-  const REQUIRED_HEADERS = ['product', 'location code', 'urn', 'stocklocationtypename'];
+  const STOCK_REQUIRED_HEADERS = ['product', 'location code', 'urn', 'stocklocationtypename'];
   const PALLET_LOCATION_TYPE = 'bulk location'; // exact deze waarde telt mee, "Bulk Location Extern" dus niet
+
+  // Referentiebestanden voor de vulgraadberekening (2.0) — vaste bestanden in
+  // de repo, geen upload. Koppelveld voor producten is "Product ID" (komt
+  // overeen met de "Product"-kolom in de voorraadexport), voor locaties is
+  // dat "Location" (komt overeen met "Location Code").
+  const REF_PRODUCTS_URL = 'data/reference/products.xlsx';
+  const REF_LOCATIONS_URL = 'data/reference/locations.xlsx';
+  const PRODUCT_REF_HEADERS = ['product id', 'length', 'width', 'height'];
+  const LOCATION_REF_HEADERS = ['location', 'length', 'width', 'height'];
+
+  // De productafmetingen zijn van het kale product, niet van de omdoos
+  // waarin het op de pallet ligt (die afmetingen zijn niet bekend). Om te
+  // voorkomen dat de vulgraad daardoor te optimistisch wordt ingeschat, telt
+  // dit percentage van de locatie-inhoud niet mee als bruikbare ruimte.
+  const OMDOOS_MARGE = 0.15;
 
   // Vaste set kolommen voor het resultaat — niet instelbaar in de UI. De rest
   // van de brondata is ruis voor het consolideren van pallets.
@@ -67,6 +94,10 @@
   let resultRows = [];        // rijen die momenteel getoond/geëxporteerd worden
   let productGroupHeader = null;        // originele headernaam van "Product Group", of null als kolom ontbreekt
   let selectedProductGroups = new Set(); // welke Product Group waarden momenteel getoond worden
+
+  let productDimsById = new Map();    // genormaliseerde Product ID -> {length,width,height} in mm
+  let locationDimsByCode = new Map(); // genormaliseerde Location Code -> {length,width,height} in mm
+  let referenceDataReady = false;     // true zodra beide referentiebestanden geladen en gekoppeld zijn
 
   function norm(v) {
     return String(v ?? '').trim();
@@ -87,8 +118,9 @@
   // Zoekt, over alle tabbladen en de eerste 20 regels van elk tabblad, naar de
   // rij die het meest lijkt op de koprij (de meeste verwachte kolomnamen
   // erin). Nodig omdat handmatige exports soms lege regels bovenaan hebben
-  // of meerdere tabbladen bevatten.
-  function findHeaderRow(workbook) {
+  // of meerdere tabbladen bevatten. requiredHeaders is generiek zodat dit
+  // ook voor de referentiebestanden (producten/locaties) gebruikt kan worden.
+  function findHeaderRow(workbook, requiredHeaders) {
     let best = null; // { sheetName, rowIndex, headerRow, matchCount }
 
     for (const sheetName of workbook.SheetNames) {
@@ -99,13 +131,94 @@
       for (let r = 0; r < scanLimit; r++) {
         const row = rows[r];
         const normalizedCells = row.map(normKey);
-        const matchCount = REQUIRED_HEADERS.filter(h => normalizedCells.includes(h)).length;
+        const matchCount = requiredHeaders.filter(h => normalizedCells.includes(h)).length;
         if (!best || matchCount > best.matchCount) {
           best = { sheetName, rowIndex: r, headerRow: row, matchCount, allRows: rows };
         }
       }
     }
     return best;
+  }
+
+  // Leest één referentiebestand (producten of locaties) en zet elke datarij
+  // om naar een object {header: waarde}, net als bij de voorraadexport.
+  async function loadRefFile(url, requiredHeaders) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${url} gaf status ${res.status}`);
+    const data = await res.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
+    const best = findHeaderRow(workbook, requiredHeaders);
+    if (!best || best.matchCount < requiredHeaders.length) {
+      throw new Error(`${url}: verwachte kolommen niet gevonden`);
+    }
+    const rows = [];
+    for (let r = best.rowIndex + 1; r < best.allRows.length; r++) {
+      const row = best.allRows[r];
+      const rowObj = {};
+      best.headerRow.forEach((cell, i) => {
+        const h = normKey(cell);
+        if (h !== '') rowObj[h] = row[i] !== undefined ? row[i] : '';
+      });
+      rows.push(rowObj);
+    }
+    return rows;
+  }
+
+  // Bouwt een opzoekkaart keyField -> {length,width,height} in mm. Rijen
+  // zonder (volledige) afmetingen worden overgeslagen — die tellen straks
+  // gewoon als "onbekend" in plaats van dat er iets geraden wordt.
+  function buildDimsMap(rows, keyField) {
+    const map = new Map();
+    rows.forEach(row => {
+      const key = normKey(row[keyField]);
+      if (key === '') return;
+      const length = Number(row['length']);
+      const width = Number(row['width']);
+      const height = Number(row['height']);
+      if (!length || !width || !height) return;
+      map.set(key, { length, width, height });
+    });
+    return map;
+  }
+
+  // Laadt de referentiebestanden op (data/reference/, geen upload). Lukt dit
+  // niet — bijv. omdat index.html lokaal via dubbelklikken geopend is i.p.v.
+  // via een webserver/GitHub Pages — dan werkt de rest van de tool gewoon
+  // door, alleen zonder vulgraadberekening.
+  async function loadReferenceData() {
+    try {
+      const [products, locations] = await Promise.all([
+        loadRefFile(REF_PRODUCTS_URL, PRODUCT_REF_HEADERS),
+        loadRefFile(REF_LOCATIONS_URL, LOCATION_REF_HEADERS),
+      ]);
+      productDimsById = buildDimsMap(products, 'product id');
+      locationDimsByCode = buildDimsMap(locations, 'location');
+      referenceDataReady = true;
+    } catch (e) {
+      console.warn('Referentiedata (locatie-/productafmetingen) kon niet geladen worden — vulgraad wordt niet berekend.', e);
+      referenceDataReady = false;
+    }
+    refDataHint.style.display = referenceDataReady ? 'none' : 'block';
+    if (baseRows.length) applyFilter(); // alsnog herberekenen als data na de eerste render binnenkomt
+  }
+  loadReferenceData();
+
+  // Vulgraad van 1 regel: hoeveel % van de bruikbare locatie-inhoud is bezet
+  // door de hoeveelheid van dit product. null als afmetingen ontbreken of de
+  // referentiedata niet geladen kon worden — dan is er niets over te zeggen.
+  function computeFillRatio(row, productHeader, locationHeader, quantityHeader) {
+    if (!referenceDataReady) return null;
+    const product = productDimsById.get(normKey(row[productHeader]));
+    const location = locationDimsByCode.get(normKey(row[locationHeader]));
+    if (!product || !location) return null;
+    const qty = Number(row[quantityHeader]);
+    if (!qty || qty <= 0) return null;
+
+    const productVolume = product.length * product.width * product.height;
+    const usableLocationVolume = location.length * location.width * location.height * (1 - OMDOOS_MARGE);
+    if (usableLocationVolume <= 0) return null;
+
+    return (productVolume * qty) / usableLocationVolume;
   }
 
   function resetUI() {
@@ -155,8 +268,8 @@
       return;
     }
 
-    const best = findHeaderRow(workbook);
-    if (!best || best.matchCount < REQUIRED_HEADERS.length) {
+    const best = findHeaderRow(workbook, STOCK_REQUIRED_HEADERS);
+    if (!best || best.matchCount < STOCK_REQUIRED_HEADERS.length) {
       showError(
         'Kon de verwachte kolommen niet vinden (Product, Location Code, Urn, ' +
         'StockLocationTypeName). Controleer of dit een voorraad-export uit het WMS is.'
@@ -259,6 +372,7 @@
   function applyFilter() {
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');
     const locationHeader = originalHeaders.find(h => normKey(h) === 'location code');
+    const quantityHeader = originalHeaders.find(h => normKey(h) === 'quantity');
 
     resultRows = baseRows.filter(row => {
       if (hideSinglePallet.checked) {
@@ -276,6 +390,12 @@
       if (pa !== pb) return pa < pb ? -1 : 1;
       const la = norm(a[locationHeader]), lb = norm(b[locationHeader]);
       return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+
+    // Vulgraad per regel opnieuw berekenen (bijv. nodig als de referentie-
+    // data pas na het inladen van de voorraad binnenkomt).
+    resultRows.forEach(row => {
+      row.__fillRatio = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
     });
 
     renderStats();
@@ -298,9 +418,29 @@
       { label: 'Artikelen op 2+ pallets (consolidatie)', num: multiPalletProducts },
       { label: 'Regels in huidig resultaat', num: resultRows.length },
     ];
+
+    // Vulgraad is alleen zinvol om te tonen als de referentiedata geladen is.
+    if (referenceDataReady) {
+      const known = resultRows.filter(r => r.__fillRatio !== null);
+      const avgFill = known.length
+        ? known.reduce((sum, r) => sum + r.__fillRatio, 0) / known.length
+        : 0;
+      stats.push({ label: 'Vulgraad bekend (van huidig resultaat)', num: `${known.length} / ${resultRows.length}` });
+      if (known.length) {
+        stats.push({ label: 'Gemiddelde vulgraad (bekend)', num: `${Math.round(avgFill * 100)}%` });
+      }
+    }
+
     statsBox.innerHTML = stats.map(s =>
       `<div class="stat"><div class="num">${s.num}</div><div class="label">${s.label}</div></div>`
     ).join('');
+  }
+
+  // Vulgraad als leesbare tekst voor tabel/export: percentage, of "onbekend"
+  // als afmetingen van product of locatie ontbreken.
+  function formatFillRatio(ratio) {
+    if (ratio === null || ratio === undefined) return 'onbekend';
+    return `${Math.round(ratio * 100)}%`;
   }
 
   function renderPreview() {
@@ -310,12 +450,15 @@
       ? `Preview: eerste ${maxPreview} van ${resultRows.length} regels.`
       : `${resultRows.length} regels.`;
 
-    const thead = '<thead><tr>' + outputColumns.map(c => `<th>${c.label}</th>`).join('') + '</tr></thead>';
+    const showFillColumn = referenceDataReady;
+    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad'] : []);
+    const thead = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
         const val = c.header ? row[c.header] : '';
         return `<td>${val === undefined || val === null ? '' : String(val)}</td>`;
       });
+      if (showFillColumn) cells.push(`<td>${formatFillRatio(row.__fillRatio)}</td>`);
       return '<tr>' + cells.join('') + '</tr>';
     }).join('');
     previewTable.innerHTML = thead + '<tbody>' + bodyRows + '</tbody>';
@@ -330,21 +473,30 @@
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Consolidatie');
 
-      // Kolombreedte: Location Code/Quantity/Urn krijgen net genoeg breedte
-      // voor hun eigen inhoud, Product Name krijgt de rest van de ruimte —
-      // dat is de kolom die je wilt kunnen lezen zonder afkapping.
+      // De 4 vaste brondkolommen, plus Vulgraad als berekende 5e kolom —
+      // maar alleen als de referentiedata geladen kon worden.
+      const exportColumns = outputColumns.concat(
+        referenceDataReady ? [{ label: 'Vulgraad', header: null, isFillColumn: true }] : []
+      );
+      const valueFor = (row, c) => c.isFillColumn
+        ? formatFillRatio(row.__fillRatio)
+        : (c.header ? row[c.header] : '');
+
+      // Kolombreedte: Location Code/Quantity/Urn/Vulgraad krijgen net genoeg
+      // breedte voor hun eigen inhoud, Product Name krijgt de rest van de
+      // ruimte — dat is de kolom die je wilt kunnen lezen zonder afkapping.
       const WIDTH_CAPS = {
         'Location Code': { min: 12, max: 22 },
         'Quantity': { min: 8, max: 12 },
         'Urn': { min: 12, max: 20 },
         'Product Name': { min: 40, max: 90 },
+        'Vulgraad': { min: 10, max: 12 },
       };
-      sheet.columns = outputColumns.map(c => {
+      sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };
         let maxLen = c.label.length;
         resultRows.forEach(row => {
-          const val = c.header ? row[c.header] : '';
-          maxLen = Math.max(maxLen, String(val ?? '').length);
+          maxLen = Math.max(maxLen, String(valueFor(row, c) ?? '').length);
         });
         const width = Math.min(Math.max(maxLen + 2, cap.min), cap.max);
         return { header: c.label, key: c.label, width };
@@ -352,7 +504,7 @@
 
       resultRows.forEach(row => {
         const rowData = {};
-        outputColumns.forEach(c => { rowData[c.label] = c.header ? row[c.header] : ''; });
+        exportColumns.forEach(c => { rowData[c.label] = valueFor(row, c); });
         sheet.addRow(rowData);
       });
 
@@ -360,7 +512,7 @@
       // bruikbaar is in Excel zonder verdere opmaak.
       sheet.getRow(1).font = { bold: true };
       sheet.views = [{ state: 'frozen', ySplit: 1 }];
-      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: outputColumns.length } };
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: exportColumns.length } };
 
       // Printopmaak: A4 liggend, alles op 1 pagina breed (hoogte mag over
       // meerdere pagina's, dat hoeft niet passend gemaakt te worden).
