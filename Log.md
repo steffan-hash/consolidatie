@@ -23,11 +23,13 @@ format.
 - Permanente fix doorgevoerd: `REF_DATA_VERSION`-constante toegevoegd bovenaan `scripts/script.js`, meegegeven als `?v=...` query-parameter aan de fetch-URL's van beide referentiebestanden. Dit dwingt een nieuwe download af zodra deze versie-waarde verandert, terwijl normale caching (sneller laden) intact blijft zolang er niets wijzigt. `PROJECT.md` bijgewerkt: bij elke toekomstige update van `products.xlsx`/`locations.xlsx` moet `REF_DATA_VERSION` mee opgehoogd worden.
 - Product owner nog niet gevraagd een harde refresh (Ctrl+Shift+R) te doen als laatste check vóór deze permanente fix live stond — dat is dus nog de eerstvolgende check.
 
+**Vervolg dezelfde sessie — bevestigd door product owner:**
+- Product owner deed een harde refresh en bevestigde: `16-3-A-124-45` toont nu een correcte vulgraad. De cache-buster-fix werkt dus zoals bedoeld; de "-45"-locatieproblematiek (uit de sessie van 2026-08-19) is hiermee definitief opgelost.
+- De oudere losse back-up `data/reference/locations.xlsx.backup-20260819-112331` (niet in git) is op verzoek van de product owner verwijderd. De back-up van deze sessie (`locations.xlsx.backup-20260824-154337`) staat nog lokaal, niet in git — nog niet gevraagd of die ook weg mag.
+
 **Nog open:**
-- Bevestigen (na een refresh, nu met de cache-buster) dat de "-45"-locaties echt 73%/een geldig percentage tonen i.p.v. "onbekend".
-- Er staat ook nog een oudere losse back-up in de werkmap van 2026-08-19 (`data/reference/locations.xlsx.backup-20260819-112331`, niet in git) — niet verwijderd, ter beoordeling aan de product owner of die weg kan.
 - Fase 3 van de roadmap (prioriteitsscore: hoeveel locaties een consolidatie daadwerkelijk vrijmaakt) staat nog steeds open.
-**Volgende stap:** Deze sessie: `scripts/script.js` en `PROJECT.md` committen/pushen, dan product owner vragen de live tool te verversen en te bevestigen dat de "-45"-locaties nu een geldige vulgraad tonen.
+**Volgende stap:** Fase 3 bouwen: per artikel op 2+ pallets het minimaal benodigd aantal pallets berekenen (totaal volume ÷ volume grootste gebruikte locatie) en daarop sorteren i.p.v. alfabetisch.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
