@@ -35,10 +35,17 @@ format.
 - `PROJECT.md` bijgewerkt: Fase 3 van "open" naar "gebouwd" gezet, met de gekozen formule beschreven.
 - **Niet end-to-end getest in een echte browser** — deze machine heeft geen Node/Python beschikbaar (zie eerdere sessies) en er stond ook geen lokale voorraadexport klaar om de tool mee te draaien. Wel zorgvuldig doorgenomen: de code hergebruikt dezelfde referentiedata-koppeling en volumeformule als de al-werkende vulgraadberekening (Fase 2), en de aanpassingen zijn beperkt tot nieuwe, losstaande berekeningen plus een uitbreiding van de sorteer-/weergavelogica.
 
+**Vervolg dezelfde sessie — visuele stap met Tailwind CSS:**
+- Op verzoek van de product owner ("visueel een stap zetten zonder het te complex te maken") is Tailwind CSS toegevoegd via de Play CDN (`<script src="https://cdn.tailwindcss.com">`, geen build-stap) — past bij de bestaande techkeuze (losse `index.html`, direct te openen).
+- `index.html`: de volledige custom `<style>`-blok (losse CSS-variabelen, class-namen als `.card`/`.btn`/`.stat`) vervangen door Tailwind-utility-classes. Merkkleuren (geel accent, donkere tekst, Poppins-lettertype) overgezet naar een kleine `tailwind.config`-uitbreiding (`brand.accent`, `brand.ink`, etc.) zodat de tool visueel hetzelfde blijft aanvoelen. Twee ongebruikte CSS-regels opgeruimd (`#successText`, `.inbox-link` — geen bijbehorend element in de HTML of `script.js`). Nieuw: een leesbare vaste breedte (`max-w-4xl`, gecentreerd) en genummerde stap-badges (1/2/3) bij de kaartkoppen.
+- `scripts/script.js`: de HTML die de tool zelf genereert (statistiektegels in `renderStats`, tabelkoppen/-cellen in `renderPreview`, de Product Group-checkboxlijst in `renderProductGroupList`) meegenomen naar dezelfde Tailwind-classes, zodat het geheel consistent oogt. Functionaliteit/logica niet aangeraakt — alleen de gegenereerde `class`-attributen.
+- **Niet visueel getest in een echte browser** — zelfde beperking als bij Fase 3 (geen Node/Python op deze machine). Wel gecontroleerd dat alle `id`'s waar `script.js` op leunt (`getElementById`) nog kloppen, en dat de enige door JS aangestuurde class-selector (`.pgCheckbox`) intact is gebleven.
+
 **Nog open:**
-- Bevestigen dat Fase 3 in de live tool (via GitHub Pages, met een echte voorraadexport) werkt zoals bedoeld: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
+- Bevestigen dat de tool nog goed werkt én er visueel op vooruitgaat na een refresh van de live tool (GitHub Pages) — inclusief een check dat Tailwind's CDN-script niet geblokkeerd wordt door een adblocker/netwerkfilter op de werkplek.
+- Fase 3 in de live tool bevestigen met een echte voorraadexport: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
 - Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
-**Volgende stap:** Product owner test de live tool met een echte voorraadexport en bevestigt dat de nieuwe sortering en de kolom "Vrij te maken locaties" kloppen. Bij akkoord: Fase 4 oppakken.
+**Volgende stap:** Product owner test de live tool: (1) ziet de tool er goed uit en werkt alles nog, (2) klopt de nieuwe sortering/kolom van Fase 3 met een echte voorraadexport. Bij akkoord op beide: Fase 4 oppakken.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.

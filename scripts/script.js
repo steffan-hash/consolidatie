@@ -436,7 +436,8 @@
   function renderProductGroupList(groups) {
     productGroupList.innerHTML = groups.map(g => {
       const id = 'pg_' + g.replace(/[^a-z0-9]/gi, '_');
-      return `<label><input type="checkbox" class="pgCheckbox" value="${g}" id="${id}" checked> ${g}</label>`;
+      return `<label class="flex items-center gap-1.5 text-sm font-medium cursor-pointer">` +
+        `<input type="checkbox" class="pgCheckbox w-3.5 h-3.5 accent-[#eab627]" value="${g}" id="${id}" checked> ${g}</label>`;
     }).join('');
     productGroupList.querySelectorAll('.pgCheckbox').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -563,7 +564,9 @@
     }
 
     statsBox.innerHTML = stats.map(s =>
-      `<div class="stat"><div class="num">${s.num}</div><div class="label">${s.label}</div></div>`
+      `<div class="bg-brand-bg border border-gray-200 rounded-xl px-3.5 py-3">` +
+      `<div class="text-xl font-bold">${s.num}</div>` +
+      `<div class="text-xs text-brand-muted mt-0.5">${s.label}</div></div>`
     ).join('');
   }
 
@@ -588,17 +591,20 @@
       ? `Preview: eerste ${maxPreview} van ${resultRows.length} regels.`
       : `${resultRows.length} regels.`;
 
+    const thClass = 'sticky top-0 z-10 bg-gray-50 text-left font-bold px-3 py-2 border-b border-gray-200 whitespace-nowrap';
+    const tdClass = 'px-3 py-2 border-b border-gray-100 whitespace-nowrap';
+
     const showFillColumn = referenceDataReady;
     const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties'] : []);
-    const thead = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+    const thead = '<thead><tr>' + headers.map(h => `<th class="${thClass}">${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
         const val = c.header ? row[c.header] : '';
-        return `<td>${val === undefined || val === null ? '' : String(val)}</td>`;
+        return `<td class="${tdClass}">${val === undefined || val === null ? '' : String(val)}</td>`;
       });
       if (showFillColumn) {
-        cells.push(`<td>${formatFillRatio(row.__fillInfo)}</td>`);
-        cells.push(`<td>${formatLocationsFreed(row.__score)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatFillRatio(row.__fillInfo)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
       }
       return '<tr>' + cells.join('') + '</tr>';
     }).join('');
