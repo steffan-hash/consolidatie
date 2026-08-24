@@ -40,7 +40,10 @@ start index.html
 - `data/reference/products.xlsx` en `data/reference/locations.xlsx`: vaste
   referentiebestanden voor de vulgraadberekening (zie Roadmap 2.0
   hieronder). Deze staan wél gewoon in git (bewuste keuze, zie Roadmap).
-  Bij een nieuwe export: bestand met dezelfde naam vervangen.
+  Bij een nieuwe export: bestand met dezelfde naam vervangen, én
+  `REF_DATA_VERSION` bovenaan `scripts/script.js` ophogen — anders toont
+  een refresh van de live tool tot 10 minuten lang nog de oude versie
+  (browsercache van GitHub Pages).
 
 ## Conventies
 - Scripts in `scripts/`

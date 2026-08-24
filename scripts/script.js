@@ -67,8 +67,14 @@
   // de repo, geen upload. Koppelveld voor producten is "Product ID" (komt
   // overeen met de "Product"-kolom in de voorraadexport), voor locaties is
   // dat "Location" (komt overeen met "Location Code").
-  const REF_PRODUCTS_URL = 'data/reference/products.xlsx';
-  const REF_LOCATIONS_URL = 'data/reference/locations.xlsx';
+  //
+  // REF_DATA_VERSION als cache-buster: GitHub Pages laat browsers deze
+  // bestanden 10 minuten cachen, dus zonder dit zou een refresh na het
+  // bijwerken van products.xlsx/locations.xlsx alsnog de oude versie tonen.
+  // Ophogen (bijv. datum) bij elke wijziging aan een van beide bestanden.
+  const REF_DATA_VERSION = '2026-08-24';
+  const REF_PRODUCTS_URL = `data/reference/products.xlsx?v=${REF_DATA_VERSION}`;
+  const REF_LOCATIONS_URL = `data/reference/locations.xlsx?v=${REF_DATA_VERSION}`;
   const PRODUCT_REF_HEADERS = ['product id', 'length', 'width', 'height'];
   const LOCATION_REF_HEADERS = ['location', 'length', 'width', 'height'];
 

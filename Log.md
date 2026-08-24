@@ -5,7 +5,7 @@ owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
 ## Sessie 2026-08-24
-**Status:** De "-45"-locatiehoogtefix (100mm placeholder → hoogte van de bijbehorende "-40"-locatie) is opnieuw doorgevoerd in `data/reference/locations.xlsx`, nu op een manier die het laden in de browser niet meer zou moeten breken. Nog niet gepusht — wacht op akkoord van de product owner (zie "Nog open").
+**Status:** De "-45"-locatiehoogtefix is opnieuw doorgevoerd en gepusht (commit `7401f9b`). Live tool laadt weer zonder fout. Onderweg bleek een tweede, apart probleem: browsercaching van de referentiebestanden — inmiddels ook opgelost (zie vervolg hieronder).
 
 **Wat gedaan — oorzaak van de vorige laadfout gevonden:**
 - De vorige sessie eindigde met: BOM-theorie (byte-order-mark) klopte niet, want ook het bevestigd werkende bestand had al een BOM op dezelfde plekken. Ware oorzaak nog onbekend.
@@ -15,11 +15,19 @@ format.
 - Geverifieerd: Excel opent het resulterende bestand weer foutloos (verse instantie), 9040 rijen intact, 0 van de 630 "-45"-locaties heeft nog hoogte 100, steekproef van onaangeraakte rijen/kolommen ongewijzigd. `scripts/script.js` gebruikt van dit bestand alleen `Location`, `Length`, `Width`, `Height` (gecontroleerd) — andere kolommen zijn dus sowieso niet relevant, ook al zou Excel's bulk-lezen/schrijven daar een klein typeverschil in geven.
 - Backup gemaakt vóór het overschrijven: `data/reference/locations.xlsx.backup-20260824-154337` (niet meegecommit, staat er puur lokaal ter herstel — de vorige bevestigd werkende versie staat toch al in git-historie).
 
+**Vervolg dezelfde sessie — na akkoord gepusht, maar "-45"-locaties toonden nog steeds "onbekend":**
+- Na akkoord van de product owner gecommit en gepusht (`7401f9b`). Product owner testte: geen foutmelding meer, maar specifieke "-45"-locaties (bijv. `16-3-A-124-45`, `16-3-A-136-45`) toonden nog steeds "onbekend" bij vulgraad, terwijl de bijbehorende "-40"/"-10"-locaties met hetzelfde product wél 73% toonden.
+- Gecontroleerd of de fix zelf goed in het gepushte bestand stond: rechtstreeks (via Excel COM) de betrokken locaties opgezocht in `data/reference/locations.xlsx` — hoogte stond correct op 1600 (was 100), dus de data zelf was in orde.
+- Gecontroleerd of GitHub Pages het nieuwe bestand al serveerde (`curl -I` op de live URL): bevestigd — juiste bestandsgrootte, tijdstempel van vandaag, cache op de GitHub-kant toonde "MISS" (dus niet een verouderd bestand op de server/CDN).
+- Oorzaak: `scripts/script.js` haalde de referentiebestanden op met een kale `fetch()`, zonder cache-buster. GitHub Pages stuurt `Cache-Control: max-age=600` mee, dus de **browser van de product owner** gebruikte tot 10 minuten lang zijn eigen, lokaal gecachte (oude) kopie — ook bij een gewone refresh (F5), die bij `max-age` binnen de geldigheidsduur niet eens een verzoek naar de server stuurt. Geen databug, puur een cache-timing-probleem.
+- Permanente fix doorgevoerd: `REF_DATA_VERSION`-constante toegevoegd bovenaan `scripts/script.js`, meegegeven als `?v=...` query-parameter aan de fetch-URL's van beide referentiebestanden. Dit dwingt een nieuwe download af zodra deze versie-waarde verandert, terwijl normale caching (sneller laden) intact blijft zolang er niets wijzigt. `PROJECT.md` bijgewerkt: bij elke toekomstige update van `products.xlsx`/`locations.xlsx` moet `REF_DATA_VERSION` mee opgehoogd worden.
+- Product owner nog niet gevraagd een harde refresh (Ctrl+Shift+R) te doen als laatste check vóór deze permanente fix live stond — dat is dus nog de eerstvolgende check.
+
 **Nog open:**
-- Nog niet gecommit/gepusht — gezien dit exacte bestand de live tool twee keer eerder heeft gebroken, eerst expliciet akkoord van de product owner vragen voordat dit weer naar `main`/GitHub Pages gaat, ook al staat in `CLAUDE.md` dat direct committen naar `main` normaal geen aparte goedkeuring nodig heeft.
+- Bevestigen (na een refresh, nu met de cache-buster) dat de "-45"-locaties echt 73%/een geldig percentage tonen i.p.v. "onbekend".
 - Er staat ook nog een oudere losse back-up in de werkmap van 2026-08-19 (`data/reference/locations.xlsx.backup-20260819-112331`, niet in git) — niet verwijderd, ter beoordeling aan de product owner of die weg kan.
 - Fase 3 van de roadmap (prioriteitsscore: hoeveel locaties een consolidatie daadwerkelijk vrijmaakt) staat nog steeds open.
-**Volgende stap:** Na akkoord: committen en pushen, en de product owner vragen de live tool nog een keer te verversen (F5) om te bevestigen dat de referentiebestanden weer laden én dat de "-45"-locaties nu een geldige vulgraad tonen i.p.v. "onbekend".
+**Volgende stap:** Deze sessie: `scripts/script.js` en `PROJECT.md` committen/pushen, dan product owner vragen de live tool te verversen en te bevestigen dat de "-45"-locaties nu een geldige vulgraad tonen.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
