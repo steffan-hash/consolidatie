@@ -5,7 +5,7 @@ owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
 ## Sessie 2026-08-24
-**Status:** De "-45"-locatiehoogtefix is opnieuw doorgevoerd en gepusht (commit `7401f9b`). Live tool laadt weer zonder fout. Onderweg bleek een tweede, apart probleem: browsercaching van de referentiebestanden — inmiddels ook opgelost (zie vervolg hieronder).
+**Status:** Lange sessie. "-45"-locatiehoogtefix en de bijbehorende browsercache-fix zijn bevestigd werkend. Fase 3 (consolidatiepotentieel/sortering) is gebouwd. De tool heeft een visuele update gekregen (Tailwind CSS, stijl richting ui.shadcn.com, 2-koloms layout, licht/donker thema). Twee ruisreductie-regels toegevoegd om de resultatenlijst gericht te maken; regel 2 ("gelijkmatige stapeling") bleek te strikt bij een echt voorbeeld en staat nog open (zie onderaan) — sessie hierop afgesloten met een uit te zoeken vraag i.p.v. een besliste aanpassing.
 
 **Wat gedaan — oorzaak van de vorige laadfout gevonden:**
 - De vorige sessie eindigde met: BOM-theorie (byte-order-mark) klopte niet, want ook het bevestigd werkende bestand had al een BOM op dezelfde plekken. Ware oorzaak nog onbekend.
@@ -70,12 +70,19 @@ format.
 - `PROJECT.md` bijgewerkt met deze twee nieuwe, niet-instelbare businessregels onder "Context die niet vanzelfsprekend is".
 - **Niet visueel/functioneel getest in een echte browser met een echte voorraadexport** — zelfde beperking als de eerdere wijzigingen deze sessie (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar).
 
+**Vervolg dezelfde sessie — terugkoppeling op de "gelijkmatige stapeling"-regel, sessie afgesloten met een open vraag:**
+- Product owner testte met een echte voorraadexport: de "gelijkmatige stapeling"-regel (ruisreductie 2) slaat bij een concreet voorbeeld niet aan. Artikel "Eurom Flameheater round 11000 terrasverwarmer" staat op 18+ pallets, allemaal met exact Quantity=3, maar de vulgraad varieert (38%–51%) omdat de pallets op verschillend-grote locaties staan. Omdat de huidige regel een *exacte* match op zowel aantal als vulgraad eist, wordt dit artikel niet uitgesloten, terwijl de product owner dit wel als "voldoende gelijkmatig gestapeld" beschouwt.
+- Voorgelegd als keuze (aantal-only, aantal+marge op vulgraad, of exacte match laten staan) — product owner koos "Other" or wilde eerst iets anders vastleggen; geen van de opties is bevestigd, dus **de regel is deze sessie NIET aangepast** en staat nog op de exacte-match-versie uit de vorige stap.
+- In plaats daarvan gevraagd om eerst de onderliggende vraag te onderzoeken: **waarom is er zoveel spreiding in vulgraad bij hetzelfde product, met schijnbaar hetzelfde soort locaties en dezelfde hoeveelheid per pallet?** Dit moet uitgezocht worden vóórdat de filterregel (aantal-only vs. marge vs. exact) opnieuw wordt vastgesteld — de aanname "zelfde product + zelfde aantal = zelfde vulgraad, dus locatiegrootte is de enige variabele" is nog niet geverifieerd tegen de echte data.
+
 **Nog open:**
-- Bevestigen dat de twee nieuwe ruisreductie-regels het gewenste effect hebben (aanzienlijk minder regels, en de juiste dingen genegeerd) met een echte voorraadexport — met name of "DOOS/BOX/TOP" als woordgrens-match de juiste producten raakt, en of de drempel van 10 pallets voor "gelijkmatige stapeling" in de praktijk goed aanvoelt.
+- **Eerstvolgende vraag om uit te zoeken:** waarom varieert de vulgraad zo sterk (in het Eurom-voorbeeld: 38%–51%) bij hetzelfde product, ogenschijnlijk hetzelfde soort locaties (bulklocaties met vergelijkbare posities, bijv. de reeks 16-3-A-xxx) en dezelfde hoeveelheid (3) per pallet? Denkrichtingen om te checken: verschillen in `Height`/`Length`/`Width` tussen de individuele `locations.xlsx`-locaties ondanks een vergelijkbare positie/naam, het effect van de vaste 200mm pallet-aftrek en 15% omdoos-marge bij kleinere locaties, of überhaupt onjuiste/inconsistente locatie-afmetingen in het referentiebestand.
+- Op basis daarvan alsnog beslissen hoe de "gelijkmatige stapeling"-regel (ruisreductie 2) aangepast moet worden: alleen op aantal, aantal + marge op vulgraad, of ongewijzigd laten.
+- Bevestigen dat de "DOOS/BOX/TOP"-woordfilter (ruisreductie 1) de juiste producten raakt.
 - Bevestigen dat het thema-knopje, donker thema en de 2-koloms layout nog goed werken.
 - Fase 3 in de live tool bevestigen met een echte voorraadexport: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
 - Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
-**Volgende stap:** Product owner test de live tool met een echte voorraadexport en beoordeelt of de twee nieuwe ruisreductie-regels de lijst voldoende gericht maken, of dat de drempels (welke woorden, 10 pallets) bijgesteld moeten worden.
+**Volgende stap:** Uitzoeken waarom de vulgraad zo sterk varieert bij schijnbaar vergelijkbare pallets van hetzelfde artikel (zie hierboven) — dat bepaalt hoe de "gelijkmatige stapeling"-regel het beste aangepast kan worden.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
