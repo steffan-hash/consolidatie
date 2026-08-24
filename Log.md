@@ -46,11 +46,18 @@ format.
 - `tailwind.config` sterk vereenvoudigd: geen eigen grijstinten/tekstkleuren meer gedefinieerd (die komen nu direct uit Tailwind's ingebouwde `zinc`-schaal), alleen nog `accent`/`accentdark` (geel) als eigen kleur.
 - **Niet visueel getest in een echte browser** — zelfde beperking als de vorige twee wijzigingen deze sessie (geen Node/Python op deze machine). Wel gecontroleerd dat alle `id`'s en de ene JS-gestuurde class (`.pgCheckbox`) intact zijn gebleven.
 
+**Vervolg dezelfde sessie — layout in 2 kolommen:**
+- Op verzoek van de product owner `index.html` omgebouwd naar een 2-koloms layout: stap 1 (upload) en stap 2 (filter) gestapeld in een linkerkolom met een vaste breedte (380px), stap 3 (resultaat) ernaast in een rechterkolom die met Tailwind's flexbox (`flex-1`) de volledige resterende breedte inneemt zodra die zichtbaar is. Werkt via dezelfde bestaande logica in `script.js` (die `resultCard.style.display` al op 'block'/'none' zette) — een verborgen flex-item telt niet mee in de layout, dus de rechterkolom verschijnt vanzelf pas als er een resultaat is.
+- Paginabreedte verruimd (`max-w-4xl` → `max-w-screen-2xl`), want een 2-koloms layout met een brede resultaattabel heeft meer ruimte nodig dan de vorige eenkoloms-opzet.
+- Op smalle schermen (mobiel/smal venster) valt de layout terug op gestapeld (`flex-col` onder het `lg`-breakpoint), met `w-full` op kaart 3 zodat die daar niet smal/scheef oogt.
+- Product Group-lijst aangepast van een brede meerkoloms-grid naar 1 kolom, omdat de linkerkolom nu maar 380px breed is.
+- **Niet visueel getest in een echte browser** — zelfde beperking als de eerdere stijlwijzigingen deze sessie (geen Node/Python op deze machine).
+
 **Nog open:**
-- Bevestigen dat de tool nog goed werkt én visueel aansluit bij de bedoeling (shadcn-achtig, geel accent) na een refresh van de live tool (GitHub Pages) — inclusief een check dat Tailwind's CDN-script niet geblokkeerd wordt door een adblocker/netwerkfilter op de werkplek.
+- Bevestigen dat de 2-koloms layout werkt zoals bedoeld (stap 1+2 links, stap 3 rechts met volledige resterende breedte zodra zichtbaar) en dat de tool visueel/functioneel nog klopt, na een refresh van de live tool (GitHub Pages).
 - Fase 3 in de live tool bevestigen met een echte voorraadexport: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
 - Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
-**Volgende stap:** Product owner test de live tool: (1) ziet de tool er goed uit en werkt alles nog, (2) klopt de nieuwe sortering/kolom van Fase 3 met een echte voorraadexport. Bij akkoord op beide: Fase 4 oppakken.
+**Volgende stap:** Product owner test de live tool: (1) klopt de 2-koloms layout en ziet alles er goed uit, (2) klopt de nieuwe sortering/kolom van Fase 3 met een echte voorraadexport. Bij akkoord op beide: Fase 4 oppakken.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
