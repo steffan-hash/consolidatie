@@ -134,12 +134,22 @@ dus een dekkingsvraagstuk in het bronbestand, geen bug in de tool. Als de
 dekking omhoog moet, is een vollediger productbestand (zonder filter op
 bijv. "actief") de aangewezen oplossing.
 
-**Fase 3 — Consolidatiepotentieel (kern van 2.0)**
-Per artikel op 2+ pallets: totaal benodigd volume afzetten tegen het
-volume van de grootste locatie die het artikel al gebruikt → minimaal
-aantal pallets nodig. Verschil met huidig aantal pallets = aantal
-locaties dat écht vrijgemaakt kan worden. Dit wordt de nieuwe
-prioriteitsscore/sortering, in plaats van alfabetisch.
+**Fase 3 — Consolidatiepotentieel (gebouwd)**
+Per artikel op 2+ pallets: totaal benodigd volume (productvolume × totale
+hoeveelheid over al zijn pallets) afgezet tegen de grootste bruikbare
+locatie-inhoud onder de locaties die het artikel al gebruikt → minimaal
+aantal pallets nodig (`Math.ceil`, met een ondergrens van 1). Verschil met
+het huidige aantal pallets = aantal locaties dat écht vrijgemaakt kan
+worden ("Vrij te maken locaties" — nooit negatief).
+Dit is nu de sortering van het resultaat (meeste winst bovenaan i.p.v.
+alfabetisch), met productnaam en locatie als tiebreaker. Zichtbaar als
+kolom in preview én export, en als totaal in de statistieken. Hangt af
+van dezelfde referentiedata als de vulgraad (Fase 2) — "onbekend" als
+productafmetingen ontbreken, of als geen van de gebruikte locaties
+bruikbare afmetingen heeft. Nog niet end-to-end getest in een echte
+browser (geen Node/Python op deze machine, geen lokale voorraadexport
+beschikbaar) — wel zorgvuldig nagelopen tegen de bestaande vulgraadlogica,
+die dezelfde formule en referentiedata hergebruikt.
 
 **Fase 4 — Werklijst voor de reachers**
 Resultaat wordt een prioriteitenlijst (meeste winst bovenaan) i.p.v. een

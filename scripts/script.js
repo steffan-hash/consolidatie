@@ -35,6 +35,13 @@
           om te voorkomen dat de vulgraad daardoor te optimistisch wordt,
           telt een vast percentage van de locatie-inhoud (OMDOOS_MARGE)
           niet mee.
+
+  Consolidatiepotentieel (2.0, Fase 3): voor elk artikel op 2+ pallets wordt
+          berekend hoeveel pallets er minimaal nodig zijn als je alles
+          consolideert op de grootste locatie die het artikel al gebruikt.
+          Het verschil met het huidige aantal pallets ("Vrij te maken
+          locaties") is de nieuwe sortering — meeste winst bovenaan, i.p.v.
+          alfabetisch op productnaam.
 */
 
 (function () {
@@ -112,6 +119,10 @@
   let productDimsById = new Map();    // genormaliseerde Product ID -> {length,width,height} in mm
   let locationDimsByCode = new Map(); // genormaliseerde Location Code -> {length,width,height} in mm
   let referenceDataReady = false;     // true zodra beide referentiebestanden geladen en gekoppeld zijn
+
+  let totalQtyByProduct = new Map();    // Product -> totale hoeveelheid over al zijn Bulk Location-pallets
+  let locationSetByProduct = new Map(); // Product -> Set van genormaliseerde Location Codes waar het nu op staat
+  let scoreByProduct = new Map();       // Product -> {minPalletsNeeded, locationsFreed}, zie computeConsolidationScores
 
   function norm(v) {
     return String(v ?? '').trim();
@@ -248,6 +259,44 @@
     return { ratio: (productVolume * qty) / usableLocationVolume, reason: 'ok' };
   }
 
+  // Fase 3 — consolidatiepotentieel: voor elk artikel op 2+ pallets, hoeveel
+  // pallets zijn er minimaal nodig als je alles consolideert op de grootste
+  // locatie die het artikel al gebruikt? Het verschil met het huidige aantal
+  // pallets is het aantal locaties dat écht vrijgemaakt kan worden — dat is
+  // de nieuwe prioriteitsscore/sortering (i.p.v. alfabetisch). Geeft geen
+  // entry terug (dus "onbekend" bij gebruik) als productafmetingen ontbreken
+  // of geen van de gebruikte locaties bruikbare afmetingen heeft.
+  function computeConsolidationScores() {
+    const scores = new Map();
+    if (!referenceDataReady) return scores;
+
+    palletCountByProduct.forEach((currentPallets, product) => {
+      const productDims = productDimsById.get(normKey(product));
+      if (!productDims) return;
+
+      // Grootste bruikbare inhoud onder de locaties waar dit artikel nu al
+      // op staat — consolideren gebeurt op een bestaande locatie, niet op
+      // een hypothetische locatie elders in het magazijn.
+      let maxUsableVolume = 0;
+      (locationSetByProduct.get(product) || new Set()).forEach(locKey => {
+        const loc = locationDimsByCode.get(locKey);
+        if (!loc) return;
+        const usableHeight = Math.max(loc.height - PALLET_HOOGTE_MM, 0);
+        const usableVolume = loc.length * loc.width * usableHeight * (1 - OMDOOS_MARGE);
+        if (usableVolume > maxUsableVolume) maxUsableVolume = usableVolume;
+      });
+      if (maxUsableVolume <= 0) return;
+
+      const totalVolume = productDims.length * productDims.width * productDims.height
+        * (totalQtyByProduct.get(product) || 0);
+      const minPalletsNeeded = Math.max(1, Math.ceil(totalVolume / maxUsableVolume));
+      const locationsFreed = Math.max(0, currentPallets - minPalletsNeeded);
+      scores.set(product, { minPalletsNeeded, locationsFreed });
+    });
+
+    return scores;
+  }
+
   function resetUI() {
     clearError();
     filterCard.style.display = 'none';
@@ -258,6 +307,9 @@
     resultRows = [];
     outputColumns = [];
     palletCountByProduct = new Map();
+    totalQtyByProduct = new Map();
+    locationSetByProduct = new Map();
+    scoreByProduct = new Map();
     productGroupHeader = null;
     selectedProductGroups = new Set();
     productGroupSection.style.display = 'none';
@@ -341,15 +393,26 @@
       return;
     }
 
-    // Per product het aantal unieke pallets (Urn's) op bulklocaties tellen.
+    // Per product het aantal unieke pallets (Urn's) op bulklocaties tellen,
+    // plus (t.b.v. Fase 3) de totale hoeveelheid en de set locaties waar het
+    // artikel nu op staat — nodig om straks het consolidatiepotentieel te
+    // berekenen.
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');
     const urnHeader = originalHeaders.find(h => normKey(h) === 'urn');
+    const locationHeaderForTotals = originalHeaders.find(h => normKey(h) === 'location code');
+    const quantityHeaderForTotals = originalHeaders.find(h => normKey(h) === 'quantity');
     const palletSetsByProduct = new Map();
+    totalQtyByProduct = new Map();
+    locationSetByProduct = new Map();
     baseRows.forEach(row => {
       const product = norm(row[productHeader]);
       const urn = norm(row[urnHeader]);
       if (!palletSetsByProduct.has(product)) palletSetsByProduct.set(product, new Set());
       palletSetsByProduct.get(product).add(urn);
+
+      totalQtyByProduct.set(product, (totalQtyByProduct.get(product) || 0) + (Number(row[quantityHeaderForTotals]) || 0));
+      if (!locationSetByProduct.has(product)) locationSetByProduct.set(product, new Set());
+      locationSetByProduct.get(product).add(normKey(row[locationHeaderForTotals]));
     });
     palletCountByProduct = new Map();
     palletSetsByProduct.forEach((set, product) => palletCountByProduct.set(product, set.size));
@@ -410,19 +473,28 @@
       return true;
     });
 
-    // Sorteren op product en daarna locatie, zodat alle pallets van hetzelfde
-    // artikel bij elkaar staan — makkelijker om ze fysiek te consolideren.
+    // Consolidatiescore opnieuw berekenen (bijv. nodig als de referentiedata
+    // pas na het inladen van de voorraad binnenkomt).
+    scoreByProduct = computeConsolidationScores();
+
+    // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan —
+    // Fase 3), en pas daarna op product en locatie zodat alle pallets van
+    // hetzelfde artikel bij elkaar staan en de volgorde bij gelijke winst
+    // voorspelbaar blijft. Artikelen zonder bekende score (-1) staan onderaan.
     resultRows = resultRows.slice().sort((a, b) => {
       const pa = norm(a[productHeader]), pb = norm(b[productHeader]);
+      const freedA = scoreByProduct.has(pa) ? scoreByProduct.get(pa).locationsFreed : -1;
+      const freedB = scoreByProduct.has(pb) ? scoreByProduct.get(pb).locationsFreed : -1;
+      if (freedA !== freedB) return freedB - freedA;
       if (pa !== pb) return pa < pb ? -1 : 1;
       const la = norm(a[locationHeader]), lb = norm(b[locationHeader]);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
-    // Vulgraad per regel opnieuw berekenen (bijv. nodig als de referentie-
-    // data pas na het inladen van de voorraad binnenkomt).
+    // Vulgraad en consolidatiescore per regel vastleggen voor weergave/export.
     resultRows.forEach(row => {
       row.__fillInfo = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
+      row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
     });
 
     renderStats();
@@ -475,6 +547,19 @@
           stats.push({ label: REASON_LABELS[reasonKey], num: reasonCounts[reasonKey] });
         }
       });
+
+      // Vrij te maken locaties optellen per uniek artikel (niet per regel,
+      // anders telt hetzelfde artikel dubbel mee via zijn meerdere pallets).
+      const productsInResult = new Set(resultRows.map(r => norm(r[productHeader])));
+      let totalLocationsFreed = 0, productsWithKnownScore = 0;
+      productsInResult.forEach(p => {
+        const score = scoreByProduct.get(p);
+        if (score) { totalLocationsFreed += score.locationsFreed; productsWithKnownScore++; }
+      });
+      stats.push({
+        label: 'Vrij te maken locaties (huidig resultaat)',
+        num: `${totalLocationsFreed} (${productsWithKnownScore}/${productsInResult.size} artikelen bekend)`,
+      });
     }
 
     statsBox.innerHTML = stats.map(s =>
@@ -489,6 +574,13 @@
     return `${Math.round(fillInfo.ratio * 100)}%`;
   }
 
+  // Vrij te maken locaties (Fase 3) als leesbare tekst: "onbekend" als er geen
+  // score berekend kon worden (zie computeConsolidationScores).
+  function formatLocationsFreed(score) {
+    if (!score) return 'onbekend';
+    return String(score.locationsFreed);
+  }
+
   function renderPreview() {
     statusEl.style.display = 'block';
     const maxPreview = 200;
@@ -497,14 +589,17 @@
       : `${resultRows.length} regels.`;
 
     const showFillColumn = referenceDataReady;
-    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad'] : []);
+    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties'] : []);
     const thead = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
         const val = c.header ? row[c.header] : '';
         return `<td>${val === undefined || val === null ? '' : String(val)}</td>`;
       });
-      if (showFillColumn) cells.push(`<td>${formatFillRatio(row.__fillInfo)}</td>`);
+      if (showFillColumn) {
+        cells.push(`<td>${formatFillRatio(row.__fillInfo)}</td>`);
+        cells.push(`<td>${formatLocationsFreed(row.__score)}</td>`);
+      }
       return '<tr>' + cells.join('') + '</tr>';
     }).join('');
     previewTable.innerHTML = thead + '<tbody>' + bodyRows + '</tbody>';
@@ -519,24 +614,32 @@
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Consolidatie');
 
-      // De 4 vaste brondkolommen, plus Vulgraad als berekende 5e kolom —
-      // maar alleen als de referentiedata geladen kon worden.
+      // De 4 vaste brondkolommen, plus Vulgraad en Vrij te maken locaties
+      // (Fase 3) als berekende kolommen — maar alleen als de referentiedata
+      // geladen kon worden.
       const exportColumns = outputColumns.concat(
-        referenceDataReady ? [{ label: 'Vulgraad', header: null, isFillColumn: true }] : []
+        referenceDataReady ? [
+          { label: 'Vulgraad', header: null, isFillColumn: true },
+          { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
+        ] : []
       );
       const valueFor = (row, c) => c.isFillColumn
         ? formatFillRatio(row.__fillInfo)
+        : c.isScoreColumn
+        ? formatLocationsFreed(row.__score)
         : (c.header ? row[c.header] : '');
 
-      // Kolombreedte: Location Code/Quantity/Urn/Vulgraad krijgen net genoeg
-      // breedte voor hun eigen inhoud, Product Name krijgt de rest van de
-      // ruimte — dat is de kolom die je wilt kunnen lezen zonder afkapping.
+      // Kolombreedte: Location Code/Quantity/Urn/Vulgraad/Vrij te maken
+      // locaties krijgen net genoeg breedte voor hun eigen inhoud, Product
+      // Name krijgt de rest van de ruimte — dat is de kolom die je wilt
+      // kunnen lezen zonder afkapping.
       const WIDTH_CAPS = {
         'Location Code': { min: 12, max: 22 },
         'Quantity': { min: 8, max: 12 },
         'Urn': { min: 12, max: 20 },
         'Product Name': { min: 40, max: 90 },
         'Vulgraad': { min: 10, max: 12 },
+        'Vrij te maken locaties': { min: 12, max: 22 },
       };
       sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };

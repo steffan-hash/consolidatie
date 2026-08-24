@@ -27,9 +27,18 @@ format.
 - Product owner deed een harde refresh en bevestigde: `16-3-A-124-45` toont nu een correcte vulgraad. De cache-buster-fix werkt dus zoals bedoeld; de "-45"-locatieproblematiek (uit de sessie van 2026-08-19) is hiermee definitief opgelost.
 - De oudere losse back-up `data/reference/locations.xlsx.backup-20260819-112331` (niet in git) is op verzoek van de product owner verwijderd. De back-up van deze sessie (`locations.xlsx.backup-20260824-154337`) staat nog lokaal, niet in git — nog niet gevraagd of die ook weg mag.
 
+**Vervolg dezelfde sessie — Fase 3 gebouwd (consolidatiepotentieel):**
+- `scripts/script.js`: nieuwe functie `computeConsolidationScores()` berekent per artikel op 2+ pallets het minimaal benodigd aantal pallets (totaal volume ÷ grootste bruikbare locatie-inhoud onder de locaties die het artikel al gebruikt) en het verschil met het huidige aantal pallets ("Vrij te maken locaties", nooit negatief). Hergebruikt dezelfde referentiedata en formule-onderdelen (`PALLET_HOOGTE_MM`, `OMDOOS_MARGE`) als de vulgraadberekening (Fase 2).
+- Twee nieuwe maps bijgehouden per artikel: `totalQtyByProduct` (som van de hoeveelheid over al zijn Bulk Location-pallets) en `locationSetByProduct` (welke locaties het artikel gebruikt) — gevuld op het moment dat het bestand wordt ingelezen, net als de bestaande `palletCountByProduct`.
+- Sortering van het resultaat aangepast: niet langer alfabetisch, maar op "Vrij te maken locaties" aflopend (meeste winst bovenaan), met productnaam en locatie als tiebreaker. Artikelen zonder bekende score (ontbrekende afmetingen) staan onderaan.
+- Nieuwe kolom "Vrij te maken locaties" toegevoegd naast Vulgraad, in zowel de preview-tabel als het geëxporteerde .xlsx-bestand. Statistieken uitgebreid met een totaal ("Vrij te maken locaties (huidig resultaat)", met hoeveel artikelen dat een bekende score hebben).
+- `PROJECT.md` bijgewerkt: Fase 3 van "open" naar "gebouwd" gezet, met de gekozen formule beschreven.
+- **Niet end-to-end getest in een echte browser** — deze machine heeft geen Node/Python beschikbaar (zie eerdere sessies) en er stond ook geen lokale voorraadexport klaar om de tool mee te draaien. Wel zorgvuldig doorgenomen: de code hergebruikt dezelfde referentiedata-koppeling en volumeformule als de al-werkende vulgraadberekening (Fase 2), en de aanpassingen zijn beperkt tot nieuwe, losstaande berekeningen plus een uitbreiding van de sorteer-/weergavelogica.
+
 **Nog open:**
-- Fase 3 van de roadmap (prioriteitsscore: hoeveel locaties een consolidatie daadwerkelijk vrijmaakt) staat nog steeds open.
-**Volgende stap:** Fase 3 bouwen: per artikel op 2+ pallets het minimaal benodigd aantal pallets berekenen (totaal volume ÷ volume grootste gebruikte locatie) en daarop sorteren i.p.v. alfabetisch.
+- Bevestigen dat Fase 3 in de live tool (via GitHub Pages, met een echte voorraadexport) werkt zoals bedoeld: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
+- Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
+**Volgende stap:** Product owner test de live tool met een echte voorraadexport en bevestigt dat de nieuwe sortering en de kolom "Vrij te maken locaties" kloppen. Bij akkoord: Fase 4 oppakken.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
