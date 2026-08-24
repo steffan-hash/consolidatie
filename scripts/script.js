@@ -64,6 +64,25 @@
   const exportBtn = document.getElementById('exportBtn');
   const refDataHint = document.getElementById('refDataHint');
 
+  // Thema-knop rechtsboven: wisselt de "dark" class op <html> (waar
+  // index.html al een eerste voorkeur voor heeft ingesteld vóór de pagina
+  // rendert, om een lichtflits te voorkomen) en onthoudt de keuze.
+  const themeToggle = document.getElementById('themeToggle');
+  const iconSun = document.getElementById('iconSun');
+  const iconMoon = document.getElementById('iconMoon');
+  function syncThemeIcon() {
+    const isDark = document.documentElement.classList.contains('dark');
+    iconSun.classList.toggle('hidden', !isDark);
+    iconMoon.classList.toggle('hidden', isDark);
+  }
+  syncThemeIcon();
+  themeToggle.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    syncThemeIcon();
+  });
+
   // Kolomnamen die we nodig hebben om het bestand te kunnen interpreteren.
   // Vergelijking gebeurt case-insensitive en na trimmen van spaties, zodat
   // kleine verschillen tussen exports geen probleem zijn.
@@ -437,7 +456,7 @@
     productGroupList.innerHTML = groups.map(g => {
       const id = 'pg_' + g.replace(/[^a-z0-9]/gi, '_');
       return `<label class="flex items-center gap-1.5 text-sm font-medium cursor-pointer">` +
-        `<input type="checkbox" class="pgCheckbox w-3.5 h-3.5 rounded border-zinc-300 accent-[#eab627]" value="${g}" id="${id}" checked> ${g}</label>`;
+        `<input type="checkbox" class="pgCheckbox w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-600 accent-[#eab627]" value="${g}" id="${id}" checked> ${g}</label>`;
     }).join('');
     productGroupList.querySelectorAll('.pgCheckbox').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -564,9 +583,9 @@
     }
 
     statsBox.innerHTML = stats.map(s =>
-      `<div class="bg-white border border-zinc-200 rounded-lg px-3.5 py-3">` +
+      `<div class="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3.5 py-3">` +
       `<div class="text-xl font-semibold">${s.num}</div>` +
-      `<div class="text-xs text-zinc-500 mt-0.5">${s.label}</div></div>`
+      `<div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${s.label}</div></div>`
     ).join('');
   }
 
@@ -591,9 +610,9 @@
       ? `Preview: eerste ${maxPreview} van ${resultRows.length} regels.`
       : `${resultRows.length} regels.`;
 
-    const thClass = 'sticky top-0 z-10 bg-zinc-50 text-left font-medium text-xs uppercase tracking-wide text-zinc-500 px-3 py-2 border-b border-zinc-200 whitespace-nowrap';
-    const tdClass = 'px-3 py-2 border-b border-zinc-100 whitespace-nowrap';
-    const trClass = 'hover:bg-zinc-50';
+    const thClass = 'sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-800 text-left font-medium text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap';
+    const tdClass = 'px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 whitespace-nowrap';
+    const trClass = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60';
 
     const showFillColumn = referenceDataReady;
     const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties'] : []);

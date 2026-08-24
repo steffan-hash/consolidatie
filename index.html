@@ -4,6 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pallet Consolidatie — WMS voorraad filter</title>
+
+  <!-- Thema (licht/donker) zo vroeg mogelijk toepassen, vóór de rest van de
+       pagina rendert — anders flitst de pagina eerst licht op voordat naar
+       donker omgeschakeld wordt. Voorkeur komt uit localStorage; bij een
+       eerste bezoek wordt de systeeminstelling van de gebruiker gevolgd. -->
+  <script>
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var dark = stored ? stored === 'dark' : prefersDark;
+      if (dark) document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,7 +30,10 @@
     // Stijl geïnspireerd op ui.shadcn.com: neutrale grijstinten (Tailwind's
     // ingebouwde zinc-schaal), Inter, kleine afgeronde hoeken. Geel accent
     // (op verzoek) blijft de enige kleur, en alleen op knoppen/checkboxen.
+    // darkMode:'class' laat het donkere thema aan/uit zetten via de "dark"
+    // class op <html>, i.p.v. automatisch op de systeeminstelling te varen.
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', 'Segoe UI', 'Arial', 'sans-serif'] },
@@ -33,13 +51,26 @@
   <!-- ExcelJS: schrijft het resultaat weg met opmaak (vetgedrukte koprij, filterknoppen) -->
   <script src="https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
-<body class="bg-zinc-50 text-zinc-900 font-sans leading-relaxed">
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans leading-relaxed">
   <div class="max-w-screen-2xl mx-auto px-6 py-10">
-    <h1 class="text-2xl font-bold tracking-tight">Pallet Consolidatie</h1>
-    <p class="text-zinc-500 text-sm mt-1 mb-6">Filter de WMS-voorraadexport op artikelen die verspreid staan over meerdere pallets op bulklocaties.</p>
+    <div class="flex items-start justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Pallet Consolidatie</h1>
+        <p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Filter de WMS-voorraadexport op artikelen die verspreid staan over meerdere pallets op bulklocaties.</p>
+      </div>
+      <button
+        type="button"
+        id="themeToggle"
+        aria-label="Wissel tussen licht en donker thema"
+        class="inline-flex items-center justify-center w-9 h-9 shrink-0 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+      >
+        <svg id="iconSun" class="hidden w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="iconMoon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      </button>
+    </div>
 
-    <div id="errorBox" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm"></div>
-    <div id="refDataHint" class="hidden bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-4 text-sm">
+    <div id="errorBox" class="hidden bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4 text-sm"></div>
+    <div id="refDataHint" class="hidden bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-lg mb-4 text-sm">
       Let op: de referentiebestanden met locatie-/productafmetingen konden niet geladen worden, dus de vulgraad wordt nu niet berekend. De rest van de tool werkt gewoon door.
     </div>
 
@@ -49,25 +80,25 @@
          zolang het hidden is, telt het niet mee in de flex-layout). -->
     <div class="flex flex-col lg:flex-row gap-5 items-start">
       <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-5">
-        <div class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
           <h2 class="text-base font-semibold mb-4">1. Voorraadbestand uploaden</h2>
           <label class="block font-medium text-sm mb-2" for="pickFileBtn">Voorraadbestand (.xlsx)</label>
           <input type="file" id="fileInput" accept=".xlsx,.xls" class="sr-only" />
           <button type="button" id="pickFileBtn" class="inline-flex items-center justify-center h-9 bg-accent hover:bg-accentdark text-zinc-900 font-medium text-sm px-4 rounded-md transition-colors cursor-pointer">Bestand kiezen</button>
-          <div class="text-zinc-500 text-xs mt-2">Upload de .xlsx export vanuit het WMS (zoals geëxporteerd via Gmail).</div>
-          <div id="fileChip" class="hidden mt-3 items-center justify-between gap-3 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2 text-sm">
+          <div class="text-zinc-500 dark:text-zinc-400 text-xs mt-2">Upload de .xlsx export vanuit het WMS (zoals geëxporteerd via Gmail).</div>
+          <div id="fileChip" class="hidden mt-3 items-center justify-between gap-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 text-sm">
             <span id="fileChipName"></span>
-            <button type="button" id="removeFileBtn" class="bg-transparent text-zinc-400 hover:text-red-600 text-lg leading-none p-0 m-0 font-normal cursor-pointer" aria-label="Verwijder bestand">×</button>
+            <button type="button" id="removeFileBtn" class="bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none p-0 m-0 font-normal cursor-pointer" aria-label="Verwijder bestand">×</button>
           </div>
         </div>
 
-        <div class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm hidden" id="filterCard">
+        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm hidden" id="filterCard">
           <h2 class="text-base font-semibold mb-4">2. Filter</h2>
           <label class="flex items-center gap-2.5 cursor-pointer text-sm font-medium">
-            <input type="checkbox" id="hideSinglePallet" checked class="w-4 h-4 rounded border-zinc-300 accent-[#eab627]" />
+            <input type="checkbox" id="hideSinglePallet" checked class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 accent-[#eab627]" />
             Verberg artikelen die maar op 1 pallet staan (alleen consolidatie-kandidaten tonen)
           </label>
-          <div class="text-zinc-500 text-xs mt-2">
+          <div class="text-zinc-500 dark:text-zinc-400 text-xs mt-2">
             Alleen "Bulk Location" wordt meegeteld als pallet-locatie. "Bulk Location Extern" en
             pick-locaties tellen niet mee, want die pallets kun je niet fysiek samenvoegen met de rest.
           </div>
@@ -77,21 +108,21 @@
           <div id="productGroupSection" class="hidden">
             <h3 class="text-sm font-semibold mt-5 mb-2">Product Group</h3>
             <div class="flex gap-4 mb-2.5">
-              <a id="selectAllGroups" class="text-sm font-medium text-zinc-900 hover:underline underline-offset-4 cursor-pointer">Alles selecteren</a>
-              <a id="selectNoneGroups" class="text-sm font-medium text-zinc-900 hover:underline underline-offset-4 cursor-pointer">Alles deselecteren</a>
+              <a id="selectAllGroups" class="text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:underline underline-offset-4 cursor-pointer">Alles selecteren</a>
+              <a id="selectNoneGroups" class="text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:underline underline-offset-4 cursor-pointer">Alles deselecteren</a>
             </div>
             <div id="productGroupList" class="grid grid-cols-1 gap-y-2 max-h-56 overflow-auto py-1"></div>
           </div>
         </div>
       </div>
 
-      <div class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm hidden w-full lg:w-auto flex-1 min-w-0" id="resultCard">
+      <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm hidden w-full lg:w-auto flex-1 min-w-0" id="resultCard">
         <h2 class="text-base font-semibold mb-4">3. Resultaat</h2>
-        <div id="status" class="hidden text-zinc-500 text-sm mb-1"></div>
-        <div id="previewWrap" class="max-h-[420px] overflow-auto border border-zinc-200 rounded-lg mt-3.5">
+        <div id="status" class="hidden text-zinc-500 dark:text-zinc-400 text-sm mb-1"></div>
+        <div id="previewWrap" class="max-h-[420px] overflow-auto border border-zinc-200 dark:border-zinc-700 rounded-lg mt-3.5">
           <table id="previewTable" class="w-full border-collapse text-sm"></table>
         </div>
-        <button id="exportBtn" class="w-full inline-flex items-center justify-center h-9 bg-accent hover:bg-accentdark disabled:bg-zinc-100 disabled:text-zinc-400 disabled:cursor-not-allowed text-zinc-900 font-medium text-sm px-4 rounded-md mt-3 transition-colors cursor-pointer">Download resultaat als .xlsx</button>
+        <button id="exportBtn" class="w-full inline-flex items-center justify-center h-9 bg-accent hover:bg-accentdark disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed text-zinc-900 font-medium text-sm px-4 rounded-md mt-3 transition-colors cursor-pointer">Download resultaat als .xlsx</button>
       </div>
     </div>
   </div>

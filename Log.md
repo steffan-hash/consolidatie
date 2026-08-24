@@ -53,11 +53,19 @@ format.
 - Product Group-lijst aangepast van een brede meerkoloms-grid naar 1 kolom, omdat de linkerkolom nu maar 380px breed is.
 - **Niet visueel getest in een echte browser** — zelfde beperking als de eerdere stijlwijzigingen deze sessie (geen Node/Python op deze machine).
 
+**Vervolg dezelfde sessie — licht/donker thema:**
+- Op verzoek een thema-knopje toegevoegd rechtsboven (zon-/maanicoon, wisselt bij een klik). Gebouwd met Tailwind's `darkMode:'class'`: alle kaarten/tabellen/tekstkleuren hebben nu een `dark:`-variant naast de bestaande lichte kleur (zowel in `index.html` als in de door `script.js` gegenereerde HTML voor statistiektegels, tabel en Product Group-lijst).
+- Voorkeur wordt onthouden in `localStorage` (`theme` = 'light'/'dark'); bij een eerste bezoek (nog niets opgeslagen) volgt de tool de systeeminstelling van de gebruiker (`prefers-color-scheme`). Deze keuze wordt in `index.html` als eerste, blokkerende `<script>` in de `<head>` toegepast (vóór Tailwind en de rest van de pagina laden), om te voorkomen dat de pagina bij het openen eerst kort licht opflitst en dan pas naar donker omschakelt.
+- Klik-logica staat in `scripts/script.js` (bij de overige DOM-referenties bovenaan): wisselt de "dark" class op `<html>`, zet `document.documentElement.style.colorScheme` (voor correcte kleur van native scrollbars/formuliervelden) en slaat de keuze op.
+- Geel accent blijft ongewijzigd in beide thema's (werkt op zowel een lichte als donkere achtergrond).
+- **Niet visueel getest in een echte browser** — zelfde beperking als de eerdere stijlwijzigingen deze sessie (geen Node/Python op deze machine). Met name het voorkomen van de "lichtflits" bij donker thema is dus nog niet met eigen ogen bevestigd.
+
 **Nog open:**
-- Bevestigen dat de 2-koloms layout werkt zoals bedoeld (stap 1+2 links, stap 3 rechts met volledige resterende breedte zodra zichtbaar) en dat de tool visueel/functioneel nog klopt, na een refresh van de live tool (GitHub Pages).
+- Bevestigen dat het thema-knopje werkt, de voorkeur onthouden wordt na een refresh, en er geen ongewenste lichtflits optreedt bij donker thema.
+- Bevestigen dat de 2-koloms layout werkt zoals bedoeld en dat de tool visueel/functioneel nog klopt, na een refresh van de live tool (GitHub Pages).
 - Fase 3 in de live tool bevestigen met een echte voorraadexport: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
 - Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
-**Volgende stap:** Product owner test de live tool: (1) klopt de 2-koloms layout en ziet alles er goed uit, (2) klopt de nieuwe sortering/kolom van Fase 3 met een echte voorraadexport. Bij akkoord op beide: Fase 4 oppakken.
+**Volgende stap:** Product owner test de live tool: (1) thema-knop en donker thema werken naar behoren, (2) 2-koloms layout klopt, (3) Fase 3-sortering/kolom klopt met een echte voorraadexport. Bij akkoord op alle drie: Fase 4 oppakken.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
