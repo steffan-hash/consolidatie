@@ -437,7 +437,7 @@
     productGroupList.innerHTML = groups.map(g => {
       const id = 'pg_' + g.replace(/[^a-z0-9]/gi, '_');
       return `<label class="flex items-center gap-1.5 text-sm font-medium cursor-pointer">` +
-        `<input type="checkbox" class="pgCheckbox w-3.5 h-3.5 accent-[#eab627]" value="${g}" id="${id}" checked> ${g}</label>`;
+        `<input type="checkbox" class="pgCheckbox w-3.5 h-3.5 rounded border-zinc-300 accent-[#eab627]" value="${g}" id="${id}" checked> ${g}</label>`;
     }).join('');
     productGroupList.querySelectorAll('.pgCheckbox').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -564,9 +564,9 @@
     }
 
     statsBox.innerHTML = stats.map(s =>
-      `<div class="bg-brand-bg border border-gray-200 rounded-xl px-3.5 py-3">` +
-      `<div class="text-xl font-bold">${s.num}</div>` +
-      `<div class="text-xs text-brand-muted mt-0.5">${s.label}</div></div>`
+      `<div class="bg-white border border-zinc-200 rounded-lg px-3.5 py-3">` +
+      `<div class="text-xl font-semibold">${s.num}</div>` +
+      `<div class="text-xs text-zinc-500 mt-0.5">${s.label}</div></div>`
     ).join('');
   }
 
@@ -591,8 +591,9 @@
       ? `Preview: eerste ${maxPreview} van ${resultRows.length} regels.`
       : `${resultRows.length} regels.`;
 
-    const thClass = 'sticky top-0 z-10 bg-gray-50 text-left font-bold px-3 py-2 border-b border-gray-200 whitespace-nowrap';
-    const tdClass = 'px-3 py-2 border-b border-gray-100 whitespace-nowrap';
+    const thClass = 'sticky top-0 z-10 bg-zinc-50 text-left font-medium text-xs uppercase tracking-wide text-zinc-500 px-3 py-2 border-b border-zinc-200 whitespace-nowrap';
+    const tdClass = 'px-3 py-2 border-b border-zinc-100 whitespace-nowrap';
+    const trClass = 'hover:bg-zinc-50';
 
     const showFillColumn = referenceDataReady;
     const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties'] : []);
@@ -606,7 +607,7 @@
         cells.push(`<td class="${tdClass}">${formatFillRatio(row.__fillInfo)}</td>`);
         cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
       }
-      return '<tr>' + cells.join('') + '</tr>';
+      return `<tr class="${trClass}">` + cells.join('') + '</tr>';
     }).join('');
     previewTable.innerHTML = thead + '<tbody>' + bodyRows + '</tbody>';
   }
