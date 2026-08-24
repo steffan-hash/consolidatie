@@ -4,6 +4,23 @@ Dit bestand wordt door Claude bijgehouden, niet handmatig door de product
 owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
+## Sessie 2026-08-24
+**Status:** De "-45"-locatiehoogtefix (100mm placeholder → hoogte van de bijbehorende "-40"-locatie) is opnieuw doorgevoerd in `data/reference/locations.xlsx`, nu op een manier die het laden in de browser niet meer zou moeten breken. Nog niet gepusht — wacht op akkoord van de product owner (zie "Nog open").
+
+**Wat gedaan — oorzaak van de vorige laadfout gevonden:**
+- De vorige sessie eindigde met: BOM-theorie (byte-order-mark) klopte niet, want ook het bevestigd werkende bestand had al een BOM op dezelfde plekken. Ware oorzaak nog onbekend.
+- Zonder een echte browser te gebruiken (geen Node/Python beschikbaar op deze machine) is dit alsnog hard aangetoond: de eerder gepushte "gefixte" bestanden (commits `73d0f16` en `3a49acf`) uit de git-historie gehaald en elk via Excel COM-automatisering geopend (dus onafhankelijk van elke browser). Excel weigerde beide bestanden te openen — ook in reparatiemodus — terwijl het bevestigd werkende bestand (`ef7cdd2`/huidig) foutloos opende. Reproduceerbaar met verse Excel-instanties, dus geen toeval.
+- Zip-structuur (Central Directory/Local File Headers) en XML-validiteit (geen ongeldige controletekens, geen locale-decimalen zoals "1500,0") van het gefixte bestand zelf gecontroleerd met een handgeschreven validatiescript — beide in orde. De corruptie zit dus ergens in hoe `[System.Xml.XmlDocument]::Save()` de volledige (1MB+) worksheet-XML herserialiseerde, niet in een makkelijk te isoleren enkel detail. Conclusie: xlsx-bestanden niet meer rechtstreeks als XML/zip bewerken via .NET — zie bijgewerkte `LESSONS.md` (LESSON 1, tekst gecorrigeerd i.p.v. een nieuwe tegenstrijdige les toegevoegd, conform CLAUDE.md).
+- Fix opnieuw uitgevoerd, nu via Excel's eigen COM-objectmodel (Excel zelf leest het bestand in, past de 70 hoogtes aan via `Range.Value2`, en slaat zelf op als .xlsx) — dus Excel schrijft het bestand, niet een los .NET-scriptje. Zelfde 70 locaties gevonden en gefixt als in de vorige sessie (0 zonder "-40"-tegenhanger, 0 met een zelf verdacht lage "-40"-hoogte).
+- Geverifieerd: Excel opent het resulterende bestand weer foutloos (verse instantie), 9040 rijen intact, 0 van de 630 "-45"-locaties heeft nog hoogte 100, steekproef van onaangeraakte rijen/kolommen ongewijzigd. `scripts/script.js` gebruikt van dit bestand alleen `Location`, `Length`, `Width`, `Height` (gecontroleerd) — andere kolommen zijn dus sowieso niet relevant, ook al zou Excel's bulk-lezen/schrijven daar een klein typeverschil in geven.
+- Backup gemaakt vóór het overschrijven: `data/reference/locations.xlsx.backup-20260824-154337` (niet meegecommit, staat er puur lokaal ter herstel — de vorige bevestigd werkende versie staat toch al in git-historie).
+
+**Nog open:**
+- Nog niet gecommit/gepusht — gezien dit exacte bestand de live tool twee keer eerder heeft gebroken, eerst expliciet akkoord van de product owner vragen voordat dit weer naar `main`/GitHub Pages gaat, ook al staat in `CLAUDE.md` dat direct committen naar `main` normaal geen aparte goedkeuring nodig heeft.
+- Er staat ook nog een oudere losse back-up in de werkmap van 2026-08-19 (`data/reference/locations.xlsx.backup-20260819-112331`, niet in git) — niet verwijderd, ter beoordeling aan de product owner of die weg kan.
+- Fase 3 van de roadmap (prioriteitsscore: hoeveel locaties een consolidatie daadwerkelijk vrijmaakt) staat nog steeds open.
+**Volgende stap:** Na akkoord: committen en pushen, en de product owner vragen de live tool nog een keer te verversen (F5) om te bevestigen dat de referentiebestanden weer laden én dat de "-45"-locaties nu een geldige vulgraad tonen i.p.v. "onbekend".
+
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.
 
