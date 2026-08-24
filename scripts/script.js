@@ -42,6 +42,16 @@
           Het verschil met het huidige aantal pallets ("Vrij te maken
           locaties") is de nieuwe sortering — meeste winst bovenaan, i.p.v.
           alfabetisch op productnaam.
+
+  Ruisreductie: twee automatische uitsluitingen om het resultaat te beperken
+          tot echte consolidatiekansen i.p.v. duizenden regels. (1) Producten
+          met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkings-
+          materiaal) tellen nergens in mee. (2) Een artikel op meer dan
+          UNIFORM_STACKING_MIN_PALLETS pallets, waarvan alle pallets exact
+          dezelfde hoeveelheid én (afgeronde) vulgraad hebben, wordt ook
+          genegeerd — dat patroon wijst op een standaard, al-optimale
+          stapelwijze. Beide uitsluitingen zijn zichtbaar in de statistieken
+          (aantal genegeerde regels/artikelen), niet stilzwijgend.
 */
 
 (function () {
@@ -88,6 +98,20 @@
   // kleine verschillen tussen exports geen probleem zijn.
   const STOCK_REQUIRED_HEADERS = ['product', 'location code', 'urn', 'stocklocationtypename'];
   const PALLET_LOCATION_TYPE = 'bulk location'; // exact deze waarde telt mee, "Bulk Location Extern" dus niet
+
+  // Ruisreductie 1: producten met een van deze losse woorden in de naam
+  // (Description) zijn verpakkingsmateriaal (dozen/omdoos-toppers), geen
+  // fysiek te consolideren magazijnartikel — worden volledig genegeerd, ook
+  // in de tellingen/statistieken. Hoofdletterongevoelig en op woordgrens,
+  // dus "TOPPY" matcht niet op "TOP".
+  const NOISE_PRODUCT_KEYWORDS = /\b(doos|box|top)\b/i;
+
+  // Ruisreductie 2: staat een artikel op meer dan dit aantal pallets, én
+  // hebben al die pallets exact dezelfde hoeveelheid én dezelfde (afgeronde)
+  // vulgraad, dan gaan we ervan uit dat dit de standaard/al-optimale manier
+  // van stapelen is voor dit artikel — niets aan te consolideren. Zie
+  // computeUniformStackingProducts().
+  const UNIFORM_STACKING_MIN_PALLETS = 10;
 
   // Referentiebestanden voor de vulgraadberekening (2.0) — vaste bestanden in
   // de repo, geen upload. Koppelveld voor producten is "Product ID" (komt
@@ -142,6 +166,9 @@
   let totalQtyByProduct = new Map();    // Product -> totale hoeveelheid over al zijn Bulk Location-pallets
   let locationSetByProduct = new Map(); // Product -> Set van genormaliseerde Location Codes waar het nu op staat
   let scoreByProduct = new Map();       // Product -> {minPalletsNeeded, locationsFreed}, zie computeConsolidationScores
+
+  let noiseExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_PRODUCT_KEYWORDS (verpakkingsmateriaal)
+  let uniformStackingProducts = new Set(); // producten genegeerd door computeUniformStackingProducts
 
   function norm(v) {
     return String(v ?? '').trim();
@@ -316,6 +343,43 @@
     return scores;
   }
 
+  // Ruisreductie 2: producten met meer dan UNIFORM_STACKING_MIN_PALLETS
+  // pallets, waarvan alle pallets exact dezelfde hoeveelheid en dezelfde
+  // (afgeronde) vulgraad hebben, negeren — dat patroon wijst op een
+  // standaard, al-optimale stapelwijze, geen consolidatiekans. Bij twijfel
+  // (vulgraad van 1 of meer pallets onbekend) wordt een artikel NIET
+  // uitgesloten, want de aanname is dan niet hard te maken. Vereist dat
+  // row.__fillInfo al gezet is voor alle rijen van het artikel (zie
+  // applyFilter, dat dit voor baseRows doet vóór deze functie aan te roepen).
+  function computeUniformStackingProducts(productHeader, quantityHeader) {
+    const rowsByProduct = new Map();
+    baseRows.forEach(row => {
+      const product = norm(row[productHeader]);
+      if (!rowsByProduct.has(product)) rowsByProduct.set(product, []);
+      rowsByProduct.get(product).push(row);
+    });
+
+    const uniform = new Set();
+    rowsByProduct.forEach((rows, product) => {
+      if ((palletCountByProduct.get(product) || 0) <= UNIFORM_STACKING_MIN_PALLETS) return;
+
+      const firstFill = rows[0].__fillInfo;
+      if (!firstFill || firstFill.reason !== 'ok') return;
+      const firstQty = norm(rows[0][quantityHeader]);
+      const firstPct = Math.round(firstFill.ratio * 100);
+
+      const allSame = rows.every(row => {
+        const fill = row.__fillInfo;
+        return fill && fill.reason === 'ok'
+          && norm(row[quantityHeader]) === firstQty
+          && Math.round(fill.ratio * 100) === firstPct;
+      });
+      if (allSame) uniform.add(product);
+    });
+
+    return uniform;
+  }
+
   function resetUI() {
     clearError();
     filterCard.style.display = 'none';
@@ -329,6 +393,8 @@
     totalQtyByProduct = new Map();
     locationSetByProduct = new Map();
     scoreByProduct = new Map();
+    noiseExcludedRowCount = 0;
+    uniformStackingProducts = new Set();
     productGroupHeader = null;
     selectedProductGroups = new Set();
     productGroupSection.style.display = 'none';
@@ -387,16 +453,24 @@
 
     const idxLocType = colIndex['stocklocationtypename'];
     const idxUrn = colIndex['urn'];
+    const idxDescription = colIndex['description'];
 
     // Alle datarijen na de koprij omzetten naar objecten, en meteen filteren
     // op StockLocationTypeName === "Bulk Location". Voorraad op pick-locaties
     // of externe bulklocaties telt niet mee voor consolidatie: die pallets
     // kunnen we niet fysiek samenvoegen met de rest van het magazijn.
+    // Ook verpakkingsmateriaal (NOISE_PRODUCT_KEYWORDS) wordt hier al
+    // uitgesloten — dat is ruis, geen fysiek te consolideren artikel.
     baseRows = [];
+    noiseExcludedRowCount = 0;
     for (let r = best.rowIndex + 1; r < best.allRows.length; r++) {
       const row = best.allRows[r];
       if (normKey(row[idxLocType]) !== PALLET_LOCATION_TYPE) continue;
       if (norm(row[idxUrn]) === '') continue; // geen pallet-ID: kan niet meegeteld worden
+      if (idxDescription !== undefined && NOISE_PRODUCT_KEYWORDS.test(norm(row[idxDescription]))) {
+        noiseExcludedRowCount++;
+        continue;
+      }
 
       // Bouw het rij-object op basis van kolomvolgorde uit de koprij.
       const rowObj = {};
@@ -477,25 +551,33 @@
     applyFilter();
   });
 
-  // Past de "verberg 1-pallet artikelen" filter toe op de al-op-Bulk-Location
-  // gefilterde basisdata, en ververst de weergave.
+  // Past alle filters toe op de al-op-Bulk-Location gefilterde basisdata
+  // (handmatig via de UI, én de automatische ruisreductie), en ververst de
+  // weergave.
   function applyFilter() {
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');
     const locationHeader = originalHeaders.find(h => normKey(h) === 'location code');
     const quantityHeader = originalHeaders.find(h => normKey(h) === 'quantity');
 
+    // Vulgraad vooraf voor ALLE basisregels berekenen (niet pas na filteren)
+    // — computeUniformStackingProducts hieronder moet naar alle pallets van
+    // een artikel kunnen kijken, los van de huidige UI-filters.
+    baseRows.forEach(row => {
+      row.__fillInfo = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
+    });
+
+    scoreByProduct = computeConsolidationScores();
+    uniformStackingProducts = computeUniformStackingProducts(productHeader, quantityHeader);
+
     resultRows = baseRows.filter(row => {
+      const product = norm(row[productHeader]);
+      if (uniformStackingProducts.has(product)) return false; // ruisreductie 2
       if (hideSinglePallet.checked) {
-        const product = norm(row[productHeader]);
         if ((palletCountByProduct.get(product) || 0) < 2) return false;
       }
       if (productGroupHeader && !selectedProductGroups.has(norm(row[productGroupHeader]))) return false;
       return true;
     });
-
-    // Consolidatiescore opnieuw berekenen (bijv. nodig als de referentiedata
-    // pas na het inladen van de voorraad binnenkomt).
-    scoreByProduct = computeConsolidationScores();
 
     // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan —
     // Fase 3), en pas daarna op product en locatie zodat alle pallets van
@@ -511,9 +593,9 @@
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
-    // Vulgraad en consolidatiescore per regel vastleggen voor weergave/export.
+    // Consolidatiescore per regel vastleggen voor weergave/export (vulgraad
+    // staat al op de rij, zie hierboven).
     resultRows.forEach(row => {
-      row.__fillInfo = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
       row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
     });
 
@@ -535,6 +617,7 @@
       { label: 'Unieke artikelen op Bulk Location', num: uniqueProducts },
       { label: 'Artikelen op maar 1 pallet', num: singlePalletProducts },
       { label: 'Artikelen op 2+ pallets (consolidatie)', num: multiPalletProducts },
+      { label: 'Genegeerd: verpakkingsmateriaal (DOOS/BOX/TOP)', num: `${noiseExcludedRowCount} regels` },
       { label: 'Regels in huidig resultaat', num: resultRows.length },
     ];
 
@@ -580,6 +663,17 @@
         label: 'Vrij te maken locaties (huidig resultaat)',
         num: `${totalLocationsFreed} (${productsWithKnownScore}/${productsInResult.size} artikelen bekend)`,
       });
+
+      // Ruisreductie 2 zichtbaar maken: hoeveel artikelen (en dus pallets)
+      // zijn genegeerd omdat ze al gelijkmatig/optimaal gestapeld staan.
+      if (uniformStackingProducts.size) {
+        let uniformPalletCount = 0;
+        uniformStackingProducts.forEach(p => { uniformPalletCount += palletCountByProduct.get(p) || 0; });
+        stats.push({
+          label: `Genegeerd: gelijkmatige stapeling (>${UNIFORM_STACKING_MIN_PALLETS} pallets, zelfde aantal/vulgraad)`,
+          num: `${uniformStackingProducts.size} artikelen (${uniformPalletCount} pallets)`,
+        });
+      }
     }
 
     statsBox.innerHTML = stats.map(s =>

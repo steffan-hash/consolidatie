@@ -60,12 +60,22 @@ format.
 - Geel accent blijft ongewijzigd in beide thema's (werkt op zowel een lichte als donkere achtergrond).
 - **Niet visueel getest in een echte browser** — zelfde beperking als de eerdere stijlwijzigingen deze sessie (geen Node/Python op deze machine). Met name het voorkomen van de "lichtflits" bij donker thema is dus nog niet met eigen ogen bevestigd.
 
+**Vervolg dezelfde sessie — thema-knop bleek niet zichtbaar (browsercache), daarna ruisreductie:**
+- Product owner meldde geen knop te zien. Gecontroleerd met `curl` op de live GitHub Pages-URL: de knop stond al correct in de geserveerde HTML (Last-Modified kwam overeen met de laatste push). Zelfde oorzaak als eerder deze week bij de referentiebestanden: GitHub Pages cachet 10 minuten (`Cache-Control: max-age=600`), en `index.html` heeft — anders dan de xlsx-referentiebestanden — geen cache-buster. Opgelost door de product owner een harde refresh (Ctrl+Shift+R) te laten doen; werkte.
+- Op verzoek van de product owner ("er staat nog veel te veel meuk in de lijst") twee automatische ruisreductie-regels toegevoegd aan `scripts/script.js`, met als doel een gerichte werklijst i.p.v. duizenden regels:
+  1. **Verpakkingsmateriaal negeren**: producten met "DOOS", "BOX" of "TOP" als los woord (hoofdletterongevoelig, woordgrens — dus "TOPPY" matcht niet) in de naam (`Description`) worden al bij het inlezen volledig genegeerd (`NOISE_PRODUCT_KEYWORDS`), dus ook niet meegeteld in pallet-aantallen/statistieken. Nieuwe teller `noiseExcludedRowCount`.
+  2. **Gelijkmatige stapeling negeren**: een artikel op meer dan 10 pallets (`UNIFORM_STACKING_MIN_PALLETS`), waarvan alle pallets exact dezelfde hoeveelheid én dezelfde afgeronde vulgraad hebben, wordt aangenomen al optimaal gestapeld te staan en wordt genegeerd (nieuwe functie `computeUniformStackingProducts`). Bij twijfel (vulgraad van 1+ pallets onbekend) blijft een artikel gewoon zichtbaar — de aanname is dan niet hard te maken.
+- `applyFilter()` herstructureerd: vulgraad wordt nu voor alle basisregels (`baseRows`) berekend vóórdat er gefilterd wordt, omdat regel 2 hierboven naar alle pallets van een artikel moet kijken, los van de huidige UI-filters (verberg-1-pallet, Product Group).
+- Beide uitsluitingen zijn zichtbaar gemaakt in de statistieken (aantal genegeerde regels/artikelen) — bewust niet stilzwijgend, zodat de product owner kan zien wat er wordt weggelaten en waarom.
+- `PROJECT.md` bijgewerkt met deze twee nieuwe, niet-instelbare businessregels onder "Context die niet vanzelfsprekend is".
+- **Niet visueel/functioneel getest in een echte browser met een echte voorraadexport** — zelfde beperking als de eerdere wijzigingen deze sessie (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar).
+
 **Nog open:**
-- Bevestigen dat het thema-knopje werkt, de voorkeur onthouden wordt na een refresh, en er geen ongewenste lichtflits optreedt bij donker thema.
-- Bevestigen dat de 2-koloms layout werkt zoals bedoeld en dat de tool visueel/functioneel nog klopt, na een refresh van de live tool (GitHub Pages).
+- Bevestigen dat de twee nieuwe ruisreductie-regels het gewenste effect hebben (aanzienlijk minder regels, en de juiste dingen genegeerd) met een echte voorraadexport — met name of "DOOS/BOX/TOP" als woordgrens-match de juiste producten raakt, en of de drempel van 10 pallets voor "gelijkmatige stapeling" in de praktijk goed aanvoelt.
+- Bevestigen dat het thema-knopje, donker thema en de 2-koloms layout nog goed werken.
 - Fase 3 in de live tool bevestigen met een echte voorraadexport: sortering op "Vrij te maken locaties", en de getoonde waarden zijn plausibel.
 - Fase 4 van de roadmap (werklijst-UI met filter/sortering op vulgraad en vrij te maken locaties) staat nog open.
-**Volgende stap:** Product owner test de live tool: (1) thema-knop en donker thema werken naar behoren, (2) 2-koloms layout klopt, (3) Fase 3-sortering/kolom klopt met een echte voorraadexport. Bij akkoord op alle drie: Fase 4 oppakken.
+**Volgende stap:** Product owner test de live tool met een echte voorraadexport en beoordeelt of de twee nieuwe ruisreductie-regels de lijst voldoende gericht maken, of dat de drempels (welke woorden, 10 pallets) bijgesteld moeten worden.
 
 ## Sessie 2026-08-19
 **Status:** Tool is overgezet naar deze repo en live via GitHub Pages. Roadmap 2.0 (vulgraad-gebaseerde consolidatie) is besproken; Fase 1 (referentiedata) en Fase 2 (vulgraad per pallet) zijn gebouwd, getest en na een terugkoppeling van de product owner verder afgesteld (pallethoogte-aftrek, reden-diagnostiek). Fase 3 (prioriteitsscore "locaties vrij te maken") staat nog open.

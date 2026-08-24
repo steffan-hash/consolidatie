@@ -64,6 +64,17 @@ start index.html
   van hetzelfde artikel bij elkaar staan in de export.
 - Printopmaak van de export staat vast op A4 liggend, geschaald naar 1
   pagina breed.
+- **Ruisreductie (op verzoek):** twee automatische uitsluitingen, zodat het
+  resultaat een gerichte werklijst is i.p.v. duizenden regels. (1) Producten
+  met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkingsmateriaal)
+  worden helemaal genegeerd — niet instelbaar, staat als `NOISE_PRODUCT_
+  KEYWORDS` in `scripts/script.js`. (2) Een artikel op meer dan 10 pallets
+  (`UNIFORM_STACKING_MIN_PALLETS`), waarvan alle pallets exact dezelfde
+  hoeveelheid én (afgeronde) vulgraad hebben, wordt ook genegeerd — dat
+  patroon wijst op een standaard, al-optimale stapelwijze, geen
+  consolidatiekans. Bij twijfel (vulgraad van 1+ pallets onbekend) wordt een
+  artikel niet uitgesloten. Beide tellingen zijn zichtbaar in de statistieken
+  (niet stilzwijgend).
 
 ## Roadmap 2.0 — slimme consolidatie
 Huidige versie telt alleen *hoeveel* pallets een artikel inneemt. 2.0 moet
