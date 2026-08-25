@@ -162,9 +162,23 @@ browser (geen Node/Python op deze machine, geen lokale voorraadexport
 beschikbaar) — wel zorgvuldig nagelopen tegen de bestaande vulgraadlogica,
 die dezelfde formule en referentiedata hergebruikt.
 
-**Fase 4 — Werklijst voor de reachers**
-Resultaat wordt een prioriteitenlijst (meeste winst bovenaan) i.p.v. een
-platte tabel, met filter/sortering op vulgraad en vrij te maken locaties.
+**Fase 4 — Werklijst voor de reachers (gebouwd)**
+"Vrij te maken locaties" (Fase 3) is een aantal, geen instructie — daarom is
+er een kolom "Actie" bijgekomen die per pallet-regel aangeeft wat een
+reachtruck-chauffeur moet doen: **Legen** (voorraad overhevelen naar een
+andere pallet van hetzelfde artikel) voor de pallets met de laagste vulgraad
+van dat artikel — precies zoveel als er vrij te maken locaties zijn — en
+**Behouden** (ontvangt die overgehevelde voorraad) voor de rest. Binnen elk
+artikel staan de "Legen"-pallets bovenaan (sortering op vulgraad oplopend),
+zodat de werklijst zelf al de juiste volgorde toont.
+Dit kan alleen betrouwbaar bepaald worden als van ALLE pallets van een
+artikel de vulgraad bekend is — is dat niet zo, dan raadt de tool niet welke
+specifieke pallet het is en toont de kolom "onbekend" voor dat hele artikel.
+Zichtbaar als kolom in preview én export, en als totaal ("Pallets aangewezen
+om te legen") in de statistieken.
+Nog niet end-to-end getest in een echte browser met een echte
+voorraadexport (zelfde beperking als eerdere fases — geen Node/Python op
+deze machine).
 
 **Fase 5 — Later / optioneel**
 - Wachtwoord-encryptie voor de referentiebestanden in de repo (zie boven).

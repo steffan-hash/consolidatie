@@ -21,12 +21,19 @@ format.
 - Geverifieerd: bestand opent foutloos in een verse Excel-instantie, rijaantal ongewijzigd (9040), 0 van de 148 "-35"-locaties in het hele bestand heeft nog een hoogte ≤200mm.
 - `scripts/script.js`: `REF_DATA_VERSION` opgehoogd naar `2026-08-25` (cache-buster), conform de vaste regel in `PROJECT.md` bij elke wijziging aan een referentiebestand.
 
+**Vervolg dezelfde sessie — Fase 4 gebouwd (werklijst met concrete actie per pallet):**
+- Terugkoppeling van de product owner: "vrij te maken locaties" als getal zegt de reachtruck-chauffeurs niet genoeg — ze moeten aangestuurd worden op *welke specifieke pallets* een lage vulgraad hebben en dus geleegd kunnen worden.
+- `scripts/script.js`: nieuwe functie `computeConsolidationActions()` wijst per artikel (met bekende "vrij te maken locaties" > 0) de pallets met de laagste vulgraad aan als **Legen** (voorraad overhevelen naar een andere pallet van hetzelfde artikel) — precies zoveel pallets als er vrij te maken zijn — en de rest als **Behouden**. Alleen mogelijk als van ALLE pallets van dat artikel de vulgraad bekend is; is dat niet zo, dan raadt de tool niet welke pallet het is en krijgt het hele artikel "onbekend" als actie (zelfde voorzichtige aanpak als bij ruisreductie 2).
+- Sortering aangepast: binnen elk artikel staan de pallets nu op vulgraad oplopend (was: op locatiecode) — zo staan de "Legen"-pallets vanzelf bovenaan in de werklijst, direct onder elkaar.
+- Nieuwe kolom "Actie" in preview (met een geel accent op "Legen"-regels, meteen herkenbaar) en in de export. Statistieken uitgebreid met een totaal ("Pallets aangewezen om te legen"), inclusief hoeveel artikelen dat niet zeker bepaald kon worden.
+- `PROJECT.md` bijgewerkt: Fase 4 van "open" naar "gebouwd" gezet.
+- **Niet end-to-end getest in een echte browser** — zelfde beperking als de andere fases deze week (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar). Wel zorgvuldig nagelopen: de nieuwe logica hergebruikt dezelfde `__fillInfo`/`__score` die al op elke rij stonden, en de wijzigingen zijn beperkt tot een nieuwe, losstaande berekening plus een uitbreiding van sortering/weergave/export — geen bestaande logica aangepast.
+
 **Nog open:**
-- **Beslissing nog nodig:** blijft de "gelijkmatige stapeling"-regel op exacte match (aantal + vulgraad), of wordt er iets anders gewenst? De sessie liet zien dat de huidige regel hier feitelijk correct gedrag vertoont (Eurom-artikel terecht niet uitgesloten) — maar dat is nog niet expliciet bevestigd door de product owner als "zo laten staan".
-- Fase 3 in de live tool bevestigen met een echte voorraadexport (sortering op "Vrij te maken locaties", plausibiliteit van de waarden) — stond al open, nog niet gedaan.
-- Fase 4 van de roadmap (werklijst-UI met filter/sortering) staat nog volledig open.
+- **Beslissing nog nodig:** blijft de "gelijkmatige stapeling"-regel op exacte match (aantal + vulgraad)? Nog niet expliciet bevestigd door de product owner.
+- Fase 3 ("Vrij te maken locaties") én de nieuwe Fase 4 ("Actie"-kolom: Legen/Behouden) bevestigen met een echte voorraadexport — zijn de aangewezen pallets logisch?
 - Nog niet gevraagd of de losse lokale backups (`locations.xlsx.backup-20260824-154337` en `-20260825-112658`) verwijderd mogen worden.
-**Volgende stap:** Product owner laten testen met een echte voorraadexport of alles nog klopt (met name of de "-35"-fix het gewenste effect heeft), en een keuze maken over de "gelijkmatige stapeling"-regel.
+**Volgende stap:** Product owner laten testen met een echte voorraadexport: klopt de "-35"-fix, en is de nieuwe "Actie"-kolom (Fase 4) bruikbaar voor de reachtruck-chauffeurs zoals bedoeld?
 
 ## Sessie 2026-08-24
 **Status:** Lange sessie. "-45"-locatiehoogtefix en de bijbehorende browsercache-fix zijn bevestigd werkend. Fase 3 (consolidatiepotentieel/sortering) is gebouwd. De tool heeft een visuele update gekregen (Tailwind CSS, stijl richting ui.shadcn.com, 2-koloms layout, licht/donker thema). Twee ruisreductie-regels toegevoegd om de resultatenlijst gericht te maken; regel 2 ("gelijkmatige stapeling") bleek te strikt bij een echt voorbeeld en staat nog open (zie onderaan) — sessie hierop afgesloten met een uit te zoeken vraag i.p.v. een besliste aanpassing.

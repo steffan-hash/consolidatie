@@ -43,6 +43,14 @@
           locaties") is de nieuwe sortering — meeste winst bovenaan, i.p.v.
           alfabetisch op productnaam.
 
+  Werklijst voor de reachers (2.0, Fase 4): naast het totale aantal "vrij te
+          maken locaties" per artikel (Fase 3) wijst de tool nu ook per
+          pallet-regel een concrete actie aan: "Legen" voor de pallets met de
+          laagste vulgraad van dat artikel (zoveel als er vrij te maken zijn),
+          "Behouden" voor de rest. Alleen als van ALLE pallets van dat artikel
+          de vulgraad bekend is — anders is niet veilig te bepalen welke
+          specifieke pallet de laagste is, en toont de kolom "onbekend".
+
   Ruisreductie: twee automatische uitsluitingen om het resultaat te beperken
           tot echte consolidatiekansen i.p.v. duizenden regels. (1) Producten
           met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkings-
@@ -343,6 +351,44 @@
     return scores;
   }
 
+  // Fase 4 — actie per pallet: van elk artikel met "vrij te maken locaties"
+  // (Fase 3) wijzen we de pallets met de laagste vulgraad aan als "te legen"
+  // (voorraad overhevelen naar een andere pallet van hetzelfde artikel), de
+  // rest als "te behouden" (ontvangt die overgehevelde voorraad). Dit kan
+  // alleen betrouwbaar als van ALLE pallets van dat artikel de vulgraad
+  // bekend is — is er twijfel, dan raden we niet welke pallet het is en
+  // krijgen alle regels van dat artikel "onbekend". Vereist dat __fillInfo
+  // en __score al gezet zijn op de meegegeven rijen (zie applyFilter).
+  function computeConsolidationActions(rows, productHeader) {
+    const rowsByProduct = new Map();
+    rows.forEach(row => {
+      const product = norm(row[productHeader]);
+      if (!rowsByProduct.has(product)) rowsByProduct.set(product, []);
+      rowsByProduct.get(product).push(row);
+    });
+
+    rowsByProduct.forEach((productRows, product) => {
+      const score = scoreByProduct.get(product);
+      if (!score || score.locationsFreed <= 0) {
+        productRows.forEach(row => { row.__action = null; }); // geen consolidatiewinst, geen actie nodig
+        return;
+      }
+
+      const allKnown = productRows.every(row => row.__fillInfo && row.__fillInfo.reason === 'ok');
+      if (!allKnown) {
+        productRows.forEach(row => { row.__action = 'onbekend'; });
+        return;
+      }
+
+      // Nooit ALLE pallets van een artikel als "te legen" aanwijzen — er moet
+      // altijd minstens 1 pallet overblijven om de voorraad op te ontvangen.
+      const toEmptyCount = Math.min(score.locationsFreed, Math.max(productRows.length - 1, 0));
+      const sortedByFill = productRows.slice().sort((a, b) => a.__fillInfo.ratio - b.__fillInfo.ratio);
+      const toEmpty = new Set(sortedByFill.slice(0, toEmptyCount));
+      productRows.forEach(row => { row.__action = toEmpty.has(row) ? 'legen' : 'behouden'; });
+    });
+  }
+
   // Ruisreductie 2: producten met meer dan UNIFORM_STACKING_MIN_PALLETS
   // pallets, waarvan alle pallets exact dezelfde hoeveelheid en dezelfde
   // (afgeronde) vulgraad hebben, negeren — dat patroon wijst op een
@@ -580,24 +626,32 @@
     });
 
     // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan —
-    // Fase 3), en pas daarna op product en locatie zodat alle pallets van
-    // hetzelfde artikel bij elkaar staan en de volgorde bij gelijke winst
-    // voorspelbaar blijft. Artikelen zonder bekende score (-1) staan onderaan.
+    // Fase 3), dan op product (zodat alle pallets van hetzelfde artikel bij
+    // elkaar staan), en als laatste op vulgraad oplopend — zo staan binnen
+    // een artikel de pallets met de laagste vulgraad (de te legen pallets,
+    // Fase 4) vanzelf boven de te behouden pallets. Artikelen zonder bekende
+    // score (-1) staan onderaan; pallets zonder bekende vulgraad staan als
+    // laatste binnen hun artikel.
     resultRows = resultRows.slice().sort((a, b) => {
       const pa = norm(a[productHeader]), pb = norm(b[productHeader]);
       const freedA = scoreByProduct.has(pa) ? scoreByProduct.get(pa).locationsFreed : -1;
       const freedB = scoreByProduct.has(pb) ? scoreByProduct.get(pb).locationsFreed : -1;
       if (freedA !== freedB) return freedB - freedA;
       if (pa !== pb) return pa < pb ? -1 : 1;
+      const fa = a.__fillInfo && a.__fillInfo.reason === 'ok' ? a.__fillInfo.ratio : Infinity;
+      const fb = b.__fillInfo && b.__fillInfo.reason === 'ok' ? b.__fillInfo.ratio : Infinity;
+      if (fa !== fb) return fa - fb;
       const la = norm(a[locationHeader]), lb = norm(b[locationHeader]);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
     // Consolidatiescore per regel vastleggen voor weergave/export (vulgraad
-    // staat al op de rij, zie hierboven).
+    // staat al op de rij, zie hierboven), en daarna pas de actie per pallet
+    // bepalen (Fase 4) — die heeft zowel __score als __fillInfo nodig.
     resultRows.forEach(row => {
       row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
     });
+    computeConsolidationActions(resultRows, productHeader);
 
     renderStats();
     renderPreview();
@@ -664,6 +718,19 @@
         num: `${totalLocationsFreed} (${productsWithKnownScore}/${productsInResult.size} artikelen bekend)`,
       });
 
+      // Fase 4: hoeveel pallets zijn concreet aangewezen om te legen, en bij
+      // hoeveel artikelen kon dat niet (vulgraad van 1+ pallets onbekend).
+      const toEmptyCount = resultRows.filter(r => r.__action === 'legen').length;
+      const unknownActionProducts = new Set(
+        resultRows.filter(r => r.__action === 'onbekend').map(r => norm(r[productHeader]))
+      ).size;
+      stats.push({
+        label: 'Pallets aangewezen om te legen (Actie)',
+        num: unknownActionProducts
+          ? `${toEmptyCount} (+${unknownActionProducts} artikelen onbekend)`
+          : `${toEmptyCount}`,
+      });
+
       // Ruisreductie 2 zichtbaar maken: hoeveel artikelen (en dus pallets)
       // zijn genegeerd omdat ze al gelijkmatig/optimaal gestapeld staan.
       if (uniformStackingProducts.size) {
@@ -697,6 +764,14 @@
     return String(score.locationsFreed);
   }
 
+  // Actie per pallet (Fase 4) als leesbare tekst, zie computeConsolidationActions.
+  function formatAction(action) {
+    if (action === 'legen') return 'Legen — overhevelen naar andere pallet';
+    if (action === 'behouden') return 'Behouden — ontvangt overige voorraad';
+    if (action === 'onbekend') return 'onbekend';
+    return '-'; // geen consolidatiewinst voor dit artikel, geen actie nodig
+  }
+
   function renderPreview() {
     statusEl.style.display = 'block';
     const maxPreview = 200;
@@ -709,7 +784,7 @@
     const trClass = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60';
 
     const showFillColumn = referenceDataReady;
-    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties'] : []);
+    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties', 'Actie'] : []);
     const thead = '<thead><tr>' + headers.map(h => `<th class="${thClass}">${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
@@ -719,6 +794,12 @@
       if (showFillColumn) {
         cells.push(`<td class="${tdClass}">${formatFillRatio(row.__fillInfo)}</td>`);
         cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
+        // "Legen"-pallets extra opvallend (geel accent), zodat ze in de
+        // preview meteen te herkennen zijn zonder de tekst te moeten lezen.
+        const actionClass = row.__action === 'legen'
+          ? `${tdClass} font-medium text-[#8a6d1a] dark:text-[#eab627]`
+          : tdClass;
+        cells.push(`<td class="${actionClass}">${formatAction(row.__action)}</td>`);
       }
       return `<tr class="${trClass}">` + cells.join('') + '</tr>';
     }).join('');
@@ -734,19 +815,22 @@
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Consolidatie');
 
-      // De 4 vaste brondkolommen, plus Vulgraad en Vrij te maken locaties
-      // (Fase 3) als berekende kolommen — maar alleen als de referentiedata
-      // geladen kon worden.
+      // De 4 vaste brondkolommen, plus Vulgraad, Vrij te maken locaties
+      // (Fase 3) en Actie (Fase 4) als berekende kolommen — maar alleen als
+      // de referentiedata geladen kon worden.
       const exportColumns = outputColumns.concat(
         referenceDataReady ? [
           { label: 'Vulgraad', header: null, isFillColumn: true },
           { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
+          { label: 'Actie', header: null, isActionColumn: true },
         ] : []
       );
       const valueFor = (row, c) => c.isFillColumn
         ? formatFillRatio(row.__fillInfo)
         : c.isScoreColumn
         ? formatLocationsFreed(row.__score)
+        : c.isActionColumn
+        ? formatAction(row.__action)
         : (c.header ? row[c.header] : '');
 
       // Kolombreedte: Location Code/Quantity/Urn/Vulgraad/Vrij te maken
@@ -760,6 +844,7 @@
         'Product Name': { min: 40, max: 90 },
         'Vulgraad': { min: 10, max: 12 },
         'Vrij te maken locaties': { min: 12, max: 22 },
+        'Actie': { min: 12, max: 40 },
       };
       sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };
