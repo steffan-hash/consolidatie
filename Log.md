@@ -36,6 +36,11 @@ format.
 - **Opvallend, niet aangepast (buiten de vraag van vandaag):** 24 locaties met Width=200000 en 2 met Width=45000 — dat zijn 200 resp. 45 meter breed, fysiek onmogelijk voor een locatie. Vermoedelijk een losse datafout (bijv. een verkeerde eenheid of foutieve invoer), maar niet onderzocht of aangepast — de product owner heeft hier nog niet naar gevraagd.
 - Backup gemaakt vóór het overschrijven (lokaal, niet meegecommit — 3e lokale backup deze sessie). Geverifieerd: bestand opent foutloos, rijaantal ongewijzigd (9040), 7753 locaties nu op 800mm, overige breedtes ongewijzigd.
 - `scripts/script.js`: `REF_DATA_VERSION` opgehoogd naar `2026-08-25b`.
+
+**Vervolg dezelfde sessie — nieuwe ruisreductie: CHITA-locaties negeren:**
+- Op verzoek een derde automatische uitsluiting toegevoegd: regels waarvan de `Location Code` (uit de voorraadexport) "CHITA" bevat worden volledig genegeerd, net als ruisreductie 1 (verpakkingsmateriaal). Nieuwe constante `NOISE_LOCATION_KEYWORD` en teller `chitaExcludedRowCount`, zichtbaar als eigen regel in de statistieken.
+- Ter controle in `data/reference/locations.xlsx` gekeken welke locaties dit raakt: 9 losse, apart benoemde plekken (`CHITA_AM1..4`, `CHITA_TOP1..4`, `CHITA_DOOS10`) — geen gewone rek-locaties met de standaard naamgeving, dus een aparte uitsluiting op naam is hier de juiste aanpak (i.p.v. bijv. op `StockLocationTypeName`, wat al bezet is door de bulk/pick-locatie-filtering).
+- `PROJECT.md` en de documentatie bovenaan `scripts/script.js` bijgewerkt (ruisreductie 1/2 → 1/2/3).
 - **Niet end-to-end getest in een echte browser** — zelfde beperking als de andere fases deze week (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar). Wel zorgvuldig nagelopen: de nieuwe logica hergebruikt dezelfde `__fillInfo`/`__score` die al op elke rij stonden, en de wijzigingen zijn beperkt tot een nieuwe, losstaande berekening plus een uitbreiding van sortering/weergave/export — geen bestaande logica aangepast.
 
 **Nog open:**

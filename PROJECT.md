@@ -73,8 +73,11 @@ start index.html
   hoeveelheid én (afgeronde) vulgraad hebben, wordt ook genegeerd — dat
   patroon wijst op een standaard, al-optimale stapelwijze, geen
   consolidatiekans. Bij twijfel (vulgraad van 1+ pallets onbekend) wordt een
-  artikel niet uitgesloten. Beide tellingen zijn zichtbaar in de statistieken
-  (niet stilzwijgend).
+  artikel niet uitgesloten. (3) Locaties waarvan de `Location Code` "CHITA"
+  bevat (bijv. `CHITA_AM1`, `CHITA_DOOS10`) worden genegeerd — dat zijn geen
+  gewone bulklocaties in het magazijnrek, staat als `NOISE_LOCATION_KEYWORD`
+  in `scripts/script.js`. Alle drie tellingen zijn zichtbaar in de
+  statistieken (niet stilzwijgend).
 
 ## Roadmap 2.0 — slimme consolidatie
 Huidige versie telt alleen *hoeveel* pallets een artikel inneemt. 2.0 moet

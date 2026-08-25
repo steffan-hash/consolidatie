@@ -51,15 +51,17 @@
           de vulgraad bekend is — anders is niet veilig te bepalen welke
           specifieke pallet de laagste is, en toont de kolom "onbekend".
 
-  Ruisreductie: twee automatische uitsluitingen om het resultaat te beperken
+  Ruisreductie: drie automatische uitsluitingen om het resultaat te beperken
           tot echte consolidatiekansen i.p.v. duizenden regels. (1) Producten
           met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkings-
           materiaal) tellen nergens in mee. (2) Een artikel op meer dan
           UNIFORM_STACKING_MIN_PALLETS pallets, waarvan alle pallets exact
           dezelfde hoeveelheid én (afgeronde) vulgraad hebben, wordt ook
           genegeerd — dat patroon wijst op een standaard, al-optimale
-          stapelwijze. Beide uitsluitingen zijn zichtbaar in de statistieken
-          (aantal genegeerde regels/artikelen), niet stilzwijgend.
+          stapelwijze. (3) Locaties waarvan de code "CHITA" bevat tellen
+          nergens in mee — geen gewone bulklocaties in het magazijnrek. Alle
+          drie uitsluitingen zijn zichtbaar in de statistieken (aantal
+          genegeerde regels/artikelen), niet stilzwijgend.
 */
 
 (function () {
@@ -113,6 +115,12 @@
   // in de tellingen/statistieken. Hoofdletterongevoelig en op woordgrens,
   // dus "TOPPY" matcht niet op "TOP".
   const NOISE_PRODUCT_KEYWORDS = /\b(doos|box|top)\b/i;
+
+  // Ruisreductie 3: locaties waarvan de code "CHITA" bevat (bijv. CHITA_AM1,
+  // CHITA_DOOS10) zijn geen gewone bulklocaties in het magazijnrek, maar
+  // apart benoemde plekken — worden op verzoek van de product owner volledig
+  // genegeerd, net als ruisreductie 1.
+  const NOISE_LOCATION_KEYWORD = /chita/i;
 
   // Ruisreductie 2: staat een artikel op meer dan dit aantal pallets, én
   // hebben al die pallets exact dezelfde hoeveelheid én dezelfde (afgeronde)
@@ -176,6 +184,7 @@
   let scoreByProduct = new Map();       // Product -> {minPalletsNeeded, locationsFreed}, zie computeConsolidationScores
 
   let noiseExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_PRODUCT_KEYWORDS (verpakkingsmateriaal)
+  let chitaExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_LOCATION_KEYWORD (CHITA-locaties)
   let uniformStackingProducts = new Set(); // producten genegeerd door computeUniformStackingProducts
 
   function norm(v) {
@@ -440,6 +449,7 @@
     locationSetByProduct = new Map();
     scoreByProduct = new Map();
     noiseExcludedRowCount = 0;
+    chitaExcludedRowCount = 0;
     uniformStackingProducts = new Set();
     productGroupHeader = null;
     selectedProductGroups = new Set();
@@ -500,21 +510,28 @@
     const idxLocType = colIndex['stocklocationtypename'];
     const idxUrn = colIndex['urn'];
     const idxDescription = colIndex['description'];
+    const idxLocationCode = colIndex['location code'];
 
     // Alle datarijen na de koprij omzetten naar objecten, en meteen filteren
     // op StockLocationTypeName === "Bulk Location". Voorraad op pick-locaties
     // of externe bulklocaties telt niet mee voor consolidatie: die pallets
     // kunnen we niet fysiek samenvoegen met de rest van het magazijn.
-    // Ook verpakkingsmateriaal (NOISE_PRODUCT_KEYWORDS) wordt hier al
-    // uitgesloten — dat is ruis, geen fysiek te consolideren artikel.
+    // Ook verpakkingsmateriaal (NOISE_PRODUCT_KEYWORDS) en CHITA-locaties
+    // (NOISE_LOCATION_KEYWORD) worden hier al uitgesloten — dat is ruis, geen
+    // fysiek te consolideren artikel/locatie.
     baseRows = [];
     noiseExcludedRowCount = 0;
+    chitaExcludedRowCount = 0;
     for (let r = best.rowIndex + 1; r < best.allRows.length; r++) {
       const row = best.allRows[r];
       if (normKey(row[idxLocType]) !== PALLET_LOCATION_TYPE) continue;
       if (norm(row[idxUrn]) === '') continue; // geen pallet-ID: kan niet meegeteld worden
       if (idxDescription !== undefined && NOISE_PRODUCT_KEYWORDS.test(norm(row[idxDescription]))) {
         noiseExcludedRowCount++;
+        continue;
+      }
+      if (idxLocationCode !== undefined && NOISE_LOCATION_KEYWORD.test(norm(row[idxLocationCode]))) {
+        chitaExcludedRowCount++;
         continue;
       }
 
@@ -672,6 +689,7 @@
       { label: 'Artikelen op maar 1 pallet', num: singlePalletProducts },
       { label: 'Artikelen op 2+ pallets (consolidatie)', num: multiPalletProducts },
       { label: 'Genegeerd: verpakkingsmateriaal (DOOS/BOX/TOP)', num: `${noiseExcludedRowCount} regels` },
+      { label: 'Genegeerd: CHITA-locaties', num: `${chitaExcludedRowCount} regels` },
       { label: 'Regels in huidig resultaat', num: resultRows.length },
     ];
 
