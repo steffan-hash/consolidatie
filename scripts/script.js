@@ -24,32 +24,61 @@
           Printopmaak staat op A4 liggend, geschaald naar 1 pagina breed,
           met Product Name zo breed als de andere kolommen toelaten.
 
-  Vulgraad (2.0): naast de voorraadexport laadt de tool automatisch twee
-          vaste referentiebestanden uit data/reference/ (products.xlsx en
-          locations.xlsx, met Length/Width/Height in mm) om te berekenen
-          hoeveel % van een locatie daadwerkelijk bezet is. Dit zijn géén
-          uploads — de bestanden staan vast in de repo en worden zelden
-          bijgewerkt. Ontbreken afmetingen van een product of locatie, dan
-          wordt de vulgraad "onbekend" i.p.v. dat er iets geraden wordt.
-          Omdozen worden genegeerd (afmetingen daarvan zijn niet bekend);
-          om te voorkomen dat de vulgraad daardoor te optimistisch wordt,
-          telt een vast percentage van de locatie-inhoud (OMDOOS_MARGE)
-          niet mee.
+  Doel (3.0): de tool moet vóór het piekseizoen zoveel mogelijk europallet-
+          plekken vrijmaken. Vorig jaar moest er een extern magazijn met 7000
+          gevulde europallet-plekken bijgehuurd worden omdat de goederen voor
+          het nieuwe seizoen binnenkwamen terwijl er nog weinig verkocht werd.
+          "Vrij te maken locaties" is daarom de kernmaat van deze tool.
 
-  Consolidatiepotentieel (2.0, Fase 3): voor elk artikel op 2+ pallets wordt
-          berekend hoeveel pallets er minimaal nodig zijn als je alles
-          consolideert op de grootste locatie die het artikel al gebruikt.
-          Het verschil met het huidige aantal pallets ("Vrij te maken
-          locaties") is de nieuwe sortering — meeste winst bovenaan, i.p.v.
-          alfabetisch op productnaam.
+  Capaciteit i.p.v. volume (3.0): een pallet wordt gestapeld, niet volgegoten.
+          Daarom rekent de tool niet meer met volume-tegen-volume, maar met
+          het aantal stuks dat er fysiek op past:
 
-  Werklijst voor de reachers (2.0, Fase 4): naast het totale aantal "vrij te
-          maken locaties" per artikel (Fase 3) wijst de tool nu ook per
-          pallet-regel een concrete actie aan: "Legen" voor de pallets met de
-          laagste vulgraad van dat artikel (zoveel als er vrij te maken zijn),
-          "Behouden" voor de rest. Alleen als van ALLE pallets van dat artikel
-          de vulgraad bekend is — anders is niet veilig te bepalen welke
-          specifieke pallet de laagste is, en toont de kolom "onbekend".
+            stuks per laag  = beste van de twee liggingen op de palletvoetprint
+                              (product staat rechtop, mag plat gedraaid worden)
+            aantal lagen    = bruikbare stapelhoogte / producthoogte
+            capaciteit      = stuks per laag × aantal lagen   (beide afgerond
+                              naar beneden — je kunt een artikel niet halveren)
+
+          Dit maakt een groot verschil. Voorbeeld: 3 stuks Eurom Flameheater
+          (980×500×500 mm) op een 2 m hoge locatie is volgens het oude
+          volumemodel 48% vol, terwijl er fysiek precies 3 stuks op passen —
+          de pallet is dus 100% vol en biedt géén consolidatiekans.
+
+          De palletvoetprint komt uit de kolom "Urn Type" in locations.xlsx
+          (Euro Pallet, Blok Pallet, 180/270 Pallet), NIET uit de Length/Width
+          van de locatie. Die kolommen bleken elkaar tegen te spreken (122
+          "Euro Pallet"-locaties stonden als 1800 mm breed geregistreerd), en
+          Urn Type is wel consistent. Zo is het model niet meer gevoelig voor
+          precies de datafouten die eerder steeds handmatig gerepareerd zijn.
+
+          Er wordt géén omdoos-marge meer afgetrokken: de afmetingen in
+          products.xlsx zijn al die van de verkoopverpakking. Bevestigd door de
+          product owner: verkopen ze iets als set, dan staat dat in de naam
+          ("... - 8 stuks") en zijn de afmetingen die van de hele set. Quantity
+          telt dus dezelfde eenheid als waar de afmetingen bij horen.
+
+  Plausibiliteitstoets (3.0): referentiedata wordt eerst gewantrouwd. 10.401 van
+          de 29.996 producten in products.xlsx staan op 1×1×1 mm — een
+          placeholder, geen meting. Zonder toets krijgt zo'n product oneindig
+          veel capaciteit, dus de maximale consolidatiescore, en komt het
+          bovenaan de werklijst te staan. Producten/locaties die de toets niet
+          halen worden "onbekend" en doen niet mee aan de rangschikking.
+
+  Zelfcorrectie op wat we zien staan (3.0): staat er meer op een pallet dan
+          volgens de berekening past, dan is de berekening fout (of er wordt
+          hoger/ruimer gestapeld dan aangenomen) — niet de werkelijkheid. In
+          dat geval wordt de waargenomen hoeveelheid de capaciteit. Dat is
+          conservatief, en het aantal keer dat dit gebeurt is zichtbaar in de
+          statistieken als signaal over de datakwaliteit.
+
+  Werklijst voor de reachers (3.0): per artikel wordt bepaald hoeveel pallets
+          er minimaal nodig zijn (vul de volste pallets, tel hun capaciteit op
+          tot de totale hoeveelheid erin past). Het verschil met het huidige
+          aantal pallets is "Vrij te maken locaties". De pallets die overblijven
+          krijgen actie "Empty" (leeghalen, minst erop = eerst), de rest "Keep".
+          Kolom "Restruimte" laat zien hoeveel stuks er nog bij kunnen — dat is
+          het getal waar een chauffeur iets mee kan.
 
   Zoekfilter: een zoekveld boven de resultaattabel filtert op de zichtbare
           kolommen (Location Code, Product Name, Quantity, Urn). Werkt als
@@ -59,17 +88,21 @@
           van het artikel kijken, ook de pallets die het zoekresultaat niet
           toont.
 
-  Ruisreductie: drie automatische uitsluitingen om het resultaat te beperken
-          tot echte consolidatiekansen i.p.v. duizenden regels. (1) Producten
-          met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkings-
-          materiaal) tellen nergens in mee. (2) Een artikel op meer dan
-          UNIFORM_STACKING_MIN_PALLETS pallets, waarvan alle pallets exact
-          dezelfde hoeveelheid én (afgeronde) vulgraad hebben, wordt ook
-          genegeerd — dat patroon wijst op een standaard, al-optimale
-          stapelwijze. (3) Locaties waarvan de code "CHITA" bevat tellen
-          nergens in mee — geen gewone bulklocaties in het magazijnrek. Alle
-          drie uitsluitingen zijn zichtbaar in de statistieken (aantal
-          genegeerde regels/artikelen), niet stilzwijgend.
+  Ruisreductie: (1) Producten met "DOOS", "BOX" of "TOP" als los woord in de
+          naam (verpakkingsmateriaal) tellen nergens in mee. (2) Locaties
+          waarvan de code "CHITA" bevat tellen nergens in mee — geen gewone
+          bulklocaties in het magazijnrek. (3) Pallets waarop meerdere
+          artikelen door elkaar staan (dezelfde Urn, verschillende producten)
+          krijgen geen advies: de capaciteit is dan niet aan één artikel toe te
+          rekenen. Alle uitsluitingen zijn zichtbaar in de statistieken, niet
+          stilzwijgend.
+
+          De eerdere regel "gelijkmatige stapeling" (artikel op >10 pallets met
+          overal dezelfde hoeveelheid én vulgraad negeren) is in 3.0 vervallen.
+          Die regel bestond alleen om artikelen te verbergen die het oude
+          volumemodel onterecht als kans aanmerkte. Met een capaciteitsmodel
+          valt een volle pallet vanzelf weg (0 vrij te maken locaties), dus de
+          regel zou nu echte kansen gaan verbergen.
 */
 
 (function () {
@@ -82,6 +115,7 @@
   const filterCard = document.getElementById('filterCard');
   const resultCard = document.getElementById('resultCard');
   const hideSinglePallet = document.getElementById('hideSinglePallet');
+  const onlyOpportunities = document.getElementById('onlyOpportunities');
   const productGroupSection = document.getElementById('productGroupSection');
   const productGroupList = document.getElementById('productGroupList');
   const selectAllGroups = document.getElementById('selectAllGroups');
@@ -131,13 +165,6 @@
   // genegeerd, net als ruisreductie 1.
   const NOISE_LOCATION_KEYWORD = /chita/i;
 
-  // Ruisreductie 2: staat een artikel op meer dan dit aantal pallets, én
-  // hebben al die pallets exact dezelfde hoeveelheid én dezelfde (afgeronde)
-  // vulgraad, dan gaan we ervan uit dat dit de standaard/al-optimale manier
-  // van stapelen is voor dit artikel — niets aan te consolideren. Zie
-  // computeUniformStackingProducts().
-  const UNIFORM_STACKING_MIN_PALLETS = 10;
-
   // Referentiebestanden voor de vulgraadberekening (2.0) — vaste bestanden in
   // de repo, geen upload. Koppelveld voor producten is "Product ID" (komt
   // overeen met de "Product"-kolom in de voorraadexport), voor locaties is
@@ -151,21 +178,42 @@
   const REF_PRODUCTS_URL = `data/reference/products.xlsx?v=${REF_DATA_VERSION}`;
   const REF_LOCATIONS_URL = `data/reference/locations.xlsx?v=${REF_DATA_VERSION}`;
   const PRODUCT_REF_HEADERS = ['product id', 'length', 'width', 'height'];
-  const LOCATION_REF_HEADERS = ['location', 'length', 'width', 'height'];
-
-  // De productafmetingen zijn van het kale product, niet van de omdoos
-  // waarin het op de pallet ligt (die afmetingen zijn niet bekend). Om te
-  // voorkomen dat de vulgraad daardoor te optimistisch wordt ingeschat, telt
-  // dit percentage van de locatie-inhoud niet mee als bruikbare ruimte. Dit
-  // is een inschatting (geen gemeten waarde) — bijstellen kan door dit getal
-  // aan te passen als de praktijk daar aanleiding toe geeft.
-  const OMDOOS_MARGE = 0.15;
+  const LOCATION_REF_HEADERS = ['location', 'height', 'urn type'];
 
   // De locatiehoogte uit het referentiebestand is de hoogte van de hele
-  // opslaglocatie, maar de producten staan op een europallet die zelf ook
-  // hoogte inneemt. Dit aantal mm gaat van de locatiehoogte af voordat de
-  // vulgraad berekend wordt, want dat is geen ruimte voor het product zelf.
+  // opslaglocatie, maar de producten staan op een pallet die zelf ook hoogte
+  // inneemt. Dit aantal mm gaat van de locatiehoogte af voordat de capaciteit
+  // berekend wordt, want dat is geen ruimte voor het product zelf.
   const PALLET_HOOGTE_MM = 200;
+
+  // In de praktijk wordt niet hoger gestapeld dan ongeveer 2 meter (opgave van
+  // de product owner: een natuurlijke grens, geen regel uit het WMS). Locaties
+  // die hoger zijn leveren dus geen extra capaciteit op. Dit is de totale
+  // hoogte van de beladen pallet, dus inclusief PALLET_HOOGTE_MM.
+  const MAX_STAPELHOOGTE_MM = 2000;
+
+  // Palletvoetprint per "Urn Type" uit locations.xlsx, in mm. Dit is de
+  // betrouwbare bron voor hoeveel vloeroppervlak er per pallet beschikbaar is
+  // — de Length/Width-kolommen van de locatie spreken elkaar tegen (er staan
+  // "Euro Pallet"-locaties op 1800 mm breed geregistreerd) terwijl Urn Type
+  // consistent is. De twee maten zijn onderling verwisselbaar: bij het
+  // berekenen van de stuks per laag proberen we het product in beide liggingen.
+  // Locatiesoorten die hier niet in staan (bijv. "Hottub", die als 200000 mm
+  // breed geregistreerd staat) leveren bewust "onbekend" op i.p.v. een gok.
+  const PALLET_FOOTPRINTS = {
+    'euro pallet': { a: 1200, b: 800 },
+    'blok pallet': { a: 1200, b: 1000 },
+    '180 pallet': { a: 1800, b: 1200 },
+    '270 pallet': { a: 2700, b: 1200 },
+  };
+
+  // Plausibiliteitsgrenzen voor de referentiedata. Een derde van de producten
+  // staat op 1×1×1 mm (placeholder); zonder deze toets krijgt zo'n product
+  // een vrijwel oneindige capaciteit en dus de hoogste consolidatiescore.
+  const PRODUCT_MIN_VOLUME_MM3 = 8000;  // kleiner dan een blokje van 2×2×2 cm bestaat niet als handelsartikel
+  const PRODUCT_MAX_SIDE_MM = 2400;     // groter dan dit past nergens in het rek
+  const LOCATION_MIN_HEIGHT_MM = 300;   // lager dan dit is geen opslaglocatie
+  const LOCATION_MAX_HEIGHT_MM = 4000;  // hoger dan dit is een invoerfout
 
   // Vaste set kolommen voor het resultaat — niet instelbaar in de UI. De rest
   // van de brondata is ruis voor het consolideren van pallets.
@@ -184,17 +232,18 @@
   let productGroupHeader = null;        // originele headernaam van "Product Group", of null als kolom ontbreekt
   let selectedProductGroups = new Set(); // welke Product Group waarden momenteel getoond worden
 
-  let productDimsById = new Map();    // genormaliseerde Product ID -> {length,width,height} in mm
-  let locationDimsByCode = new Map(); // genormaliseerde Location Code -> {length,width,height} in mm
+  let productDimsById = new Map();    // genormaliseerde Product ID -> {length,width,height} in mm, alleen plausibele
+  let locationInfoByCode = new Map(); // genormaliseerde Location Code -> {height, urnType, footprint}
   let referenceDataReady = false;     // true zodra beide referentiebestanden geladen en gekoppeld zijn
 
   let totalQtyByProduct = new Map();    // Product -> totale hoeveelheid over al zijn Bulk Location-pallets
-  let locationSetByProduct = new Map(); // Product -> Set van genormaliseerde Location Codes waar het nu op staat
   let scoreByProduct = new Map();       // Product -> {minPalletsNeeded, locationsFreed}, zie computeConsolidationScores
+  let mixedPalletUrns = new Set();      // Urn's waarop meerdere verschillende artikelen staan
 
   let noiseExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_PRODUCT_KEYWORDS (verpakkingsmateriaal)
   let chitaExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_LOCATION_KEYWORD (CHITA-locaties)
-  let uniformStackingProducts = new Set(); // producten genegeerd door computeUniformStackingProducts
+  let observedOverrideCount = 0;         // aantal pallets waar meer op staat dan berekend past (zelfcorrectie)
+  let refStats = null;                   // telling van afgekeurde referentiedata, voor de statistieken
 
   function norm(v) {
     return String(v ?? '').trim();
@@ -261,21 +310,48 @@
     return rows;
   }
 
-  // Bouwt een opzoekkaart keyField -> {length,width,height} in mm. Rijen
-  // zonder (volledige) afmetingen worden overgeslagen — die tellen straks
-  // gewoon als "onbekend" in plaats van dat er iets geraden wordt.
-  function buildDimsMap(rows, keyField) {
+  // Bouwt de productkaart: Product ID -> afmetingen in mm. Alleen producten
+  // die de plausibiliteitstoets halen komen erin. Dat is essentieel: een derde
+  // van products.xlsx staat op 1×1×1 mm (placeholder), en zo'n product zou
+  // anders een vrijwel oneindige palletcapaciteit krijgen en daarmee de
+  // hoogste consolidatiescore van allemaal.
+  function buildProductDims(rows) {
     const map = new Map();
+    const rejected = { leeg: 0, placeholder: 0, teKlein: 0, teGroot: 0 };
     rows.forEach(row => {
-      const key = normKey(row[keyField]);
+      const key = normKey(row['product id']);
       if (key === '') return;
       const length = Number(row['length']);
       const width = Number(row['width']);
       const height = Number(row['height']);
-      if (!length || !width || !height) return;
+      if (!length || !width || !height || length < 0 || width < 0 || height < 0) { rejected.leeg++; return; }
+      if (length === 1 && width === 1 && height === 1) { rejected.placeholder++; return; }
+      if (length * width * height < PRODUCT_MIN_VOLUME_MM3) { rejected.teKlein++; return; }
+      if (length > PRODUCT_MAX_SIDE_MM || width > PRODUCT_MAX_SIDE_MM || height > PRODUCT_MAX_SIDE_MM) { rejected.teGroot++; return; }
       map.set(key, { length, width, height });
     });
-    return map;
+    return { map, rejected, total: rows.length };
+  }
+
+  // Bouwt de locatiekaart: Location -> {hoogte, palletsoort, voetprint}. De
+  // Length/Width van de locatie worden bewust NIET gebruikt (die spreken elkaar
+  // tegen) — de voetprint komt uit Urn Type. Alleen de hoogte komt uit de
+  // locatie zelf, want die bepaalt hoeveel lagen er op kunnen.
+  function buildLocationInfo(rows) {
+    const map = new Map();
+    const rejected = { leeg: 0, hoogteOnwaarschijnlijk: 0, palletsoortOnbekend: 0 };
+    rows.forEach(row => {
+      const key = normKey(row['location']);
+      if (key === '') return;
+      const height = Number(row['height']);
+      if (!height || height < 0) { rejected.leeg++; return; }
+      if (height < LOCATION_MIN_HEIGHT_MM || height > LOCATION_MAX_HEIGHT_MM) { rejected.hoogteOnwaarschijnlijk++; return; }
+      const urnType = normKey(row['urn type']);
+      const footprint = PALLET_FOOTPRINTS[urnType];
+      if (!footprint) { rejected.palletsoortOnbekend++; return; }
+      map.set(key, { height, urnType, footprint });
+    });
+    return { map, rejected, total: rows.length };
   }
 
   // Laadt de referentiebestanden op (data/reference/, geen upload). Lukt dit
@@ -288,14 +364,21 @@
         loadRefFile(REF_PRODUCTS_URL, PRODUCT_REF_HEADERS),
         loadRefFile(REF_LOCATIONS_URL, LOCATION_REF_HEADERS),
       ]);
-      productDimsById = buildDimsMap(products, 'product id');
-      locationDimsByCode = buildDimsMap(locations, 'location');
+      const prodResult = buildProductDims(products);
+      const locResult = buildLocationInfo(locations);
+      productDimsById = prodResult.map;
+      locationInfoByCode = locResult.map;
+      refStats = { products: prodResult, locations: locResult };
       referenceDataReady = true;
       // Zichtbaar in de browserconsole (F12) zodat te zien is hoeveel van de
-      // referentiebestanden daadwerkelijk bruikbare afmetingen bevatten.
+      // referentiebestanden de plausibiliteitstoets haalt, en waarom niet.
       console.info(
-        `Referentiedata geladen: producten ${productDimsById.size}/${products.length} met afmetingen, ` +
-        `locaties ${locationDimsByCode.size}/${locations.length} met afmetingen.`
+        `Referentiedata geladen. Producten bruikbaar: ${productDimsById.size}/${products.length} ` +
+        `(afgekeurd: ${prodResult.rejected.placeholder} placeholder 1x1x1, ${prodResult.rejected.leeg} leeg, ` +
+        `${prodResult.rejected.teKlein} te klein, ${prodResult.rejected.teGroot} te groot). ` +
+        `Locaties bruikbaar: ${locationInfoByCode.size}/${locations.length} ` +
+        `(afgekeurd: ${locResult.rejected.palletsoortOnbekend} palletsoort onbekend, ` +
+        `${locResult.rejected.hoogteOnwaarschijnlijk} onwaarschijnlijke hoogte, ${locResult.rejected.leeg} leeg).`
       );
     } catch (e) {
       console.warn('Referentiedata (locatie-/productafmetingen) kon niet geladen worden — vulgraad wordt niet berekend.', e);
@@ -306,78 +389,137 @@
   }
   loadReferenceData();
 
-  // Vulgraad van 1 regel: hoeveel % van de bruikbare locatie-inhoud is bezet
-  // door de hoeveelheid van dit product. Geeft altijd een reden mee als het
-  // niet lukt, zodat in de statistieken zichtbaar is WAAROM iets "onbekend"
-  // is (referentiedata niet geladen, product/locatie niet in het
-  // referentiebestand, geen geldig aantal, of locatie te laag).
-  function computeFillRatio(row, productHeader, locationHeader, quantityHeader) {
-    if (!referenceDataReady) return { ratio: null, reason: 'referentiedata-niet-geladen' };
-
-    const product = productDimsById.get(normKey(row[productHeader]));
-    if (!product) return { ratio: null, reason: 'product-onbekend' };
-
-    const location = locationDimsByCode.get(normKey(row[locationHeader]));
-    if (!location) return { ratio: null, reason: 'locatie-onbekend' };
-
-    const qty = Number(row[quantityHeader]);
-    if (!qty || qty <= 0) return { ratio: null, reason: 'aantal-ongeldig' };
-
-    const productVolume = product.length * product.width * product.height;
-    const usableHeight = Math.max(location.height - PALLET_HOOGTE_MM, 0);
-    const usableLocationVolume = location.length * location.width * usableHeight * (1 - OMDOOS_MARGE);
-    if (usableLocationVolume <= 0) return { ratio: null, reason: 'locatie-te-laag' };
-
-    return { ratio: (productVolume * qty) / usableLocationVolume, reason: 'ok' };
+  // Hoeveel stuks passen er naast elkaar in één laag op de palletvoetprint?
+  // Het product staat rechtop (hoogte is vast), maar mag in het platte vlak
+  // een kwartslag gedraaid worden — we nemen de beste van die twee liggingen.
+  // Afronden naar beneden, want een half artikel bestaat niet.
+  function unitsPerLayer(productLength, productWidth, footprint) {
+    const opstelling1 = Math.floor(footprint.a / productLength) * Math.floor(footprint.b / productWidth);
+    const opstelling2 = Math.floor(footprint.a / productWidth) * Math.floor(footprint.b / productLength);
+    return Math.max(opstelling1, opstelling2);
   }
 
-  // Fase 3 — consolidatiepotentieel: voor elk artikel op 2+ pallets, hoeveel
-  // pallets zijn er minimaal nodig als je alles consolideert op de grootste
-  // locatie die het artikel al gebruikt? Het verschil met het huidige aantal
-  // pallets is het aantal locaties dat écht vrijgemaakt kan worden — dat is
-  // de nieuwe prioriteitsscore/sortering (i.p.v. alfabetisch). Geeft geen
-  // entry terug (dus "onbekend" bij gebruik) als productafmetingen ontbreken
-  // of geen van de gebruikte locaties bruikbare afmetingen heeft.
-  function computeConsolidationScores() {
+  // Capaciteit van 1 pallet-regel: hoeveel stuks van dit artikel passen er
+  // fysiek op deze pallet op deze locatie? Dit vervangt de oude volumeratio.
+  // Geeft altijd een reden mee als het niet lukt, zodat in de statistieken
+  // zichtbaar is WAAROM iets onbekend is i.p.v. dat er iets geraden wordt.
+  function computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader) {
+    if (!referenceDataReady) return { reason: 'referentiedata-niet-geladen' };
+
+    const qty = Number(row[quantityHeader]);
+    if (!qty || qty <= 0) return { reason: 'aantal-ongeldig' };
+
+    // Staan er meerdere artikelen op dezelfde pallet, dan is de capaciteit
+    // niet aan één artikel toe te rekenen — dan geven we geen advies.
+    if (mixedPalletUrns.has(norm(row[urnHeader]))) return { reason: 'gemengde-pallet' };
+
+    const product = productDimsById.get(normKey(row[productHeader]));
+    if (!product) return { reason: 'product-afmetingen-onbetrouwbaar' };
+
+    const location = locationInfoByCode.get(normKey(row[locationHeader]));
+    if (!location) return { reason: 'locatie-onbruikbaar' };
+
+    // Stapelhoogte: de laagste van de locatiehoogte en de praktijkgrens van
+    // ~2 m, min de hoogte die de pallet zelf inneemt.
+    const stapelHoogte = Math.min(location.height, MAX_STAPELHOOGTE_MM) - PALLET_HOOGTE_MM;
+    if (stapelHoogte <= 0) return { reason: 'locatie-te-laag' };
+
+    const perLaag = unitsPerLayer(product.length, product.width, location.footprint);
+    if (perLaag <= 0) return { reason: 'past-niet-op-pallet' };
+
+    const lagen = Math.floor(stapelHoogte / product.height);
+    if (lagen <= 0) return { reason: 'product-te-hoog' };
+
+    const berekend = perLaag * lagen;
+
+    // Zelfcorrectie: staat er méér op dan we berekenden, dan is de berekening
+    // fout (of er wordt hoger/ruimer gestapeld dan aangenomen) — niet de
+    // werkelijkheid. De waarneming wint, want die staat er fysiek.
+    const capacity = Math.max(berekend, qty);
+    if (capacity > berekend) observedOverrideCount++;
+
+    return {
+      reason: 'ok',
+      capacity,
+      berekend,
+      qty,
+      perLaag,
+      lagen,
+      restruimte: capacity - qty,
+      ratio: qty / capacity,
+    };
+  }
+
+  // Consolidatiepotentieel: hoeveel pallets heeft een artikel minimaal nodig?
+  // We vullen de volste pallets eerst en tellen hun capaciteit op tot de
+  // totale hoeveelheid erin past. Het aantal pallets dat dan overblijft is het
+  // aantal locaties dat daadwerkelijk vrijgemaakt kan worden — de kernmaat van
+  // deze tool (zie doel bovenaan: europallet-plekken vrijmaken vóór de piek).
+  //
+  // Vereist dat __cap al op alle baseRows staat (zie applyFilter). Artikelen
+  // waarvan ook maar één pallet een onbekende capaciteit heeft krijgen géén
+  // score: dan is niet te zeggen of het echt in minder pallets past.
+  function computeConsolidationScores(productHeader, urnHeader) {
     const scores = new Map();
     if (!referenceDataReady) return scores;
 
-    palletCountByProduct.forEach((currentPallets, product) => {
-      const productDims = productDimsById.get(normKey(product));
-      if (!productDims) return;
+    const rowsByProduct = new Map();
+    baseRows.forEach(row => {
+      const product = norm(row[productHeader]);
+      if (!rowsByProduct.has(product)) rowsByProduct.set(product, []);
+      rowsByProduct.get(product).push(row);
+    });
 
-      // Grootste bruikbare inhoud onder de locaties waar dit artikel nu al
-      // op staat — consolideren gebeurt op een bestaande locatie, niet op
-      // een hypothetische locatie elders in het magazijn.
-      let maxUsableVolume = 0;
-      (locationSetByProduct.get(product) || new Set()).forEach(locKey => {
-        const loc = locationDimsByCode.get(locKey);
-        if (!loc) return;
-        const usableHeight = Math.max(loc.height - PALLET_HOOGTE_MM, 0);
-        const usableVolume = loc.length * loc.width * usableHeight * (1 - OMDOOS_MARGE);
-        if (usableVolume > maxUsableVolume) maxUsableVolume = usableVolume;
-      });
-      if (maxUsableVolume <= 0) return;
+    rowsByProduct.forEach((rows, product) => {
+      if (!rows.every(r => r.__cap && r.__cap.reason === 'ok')) return;
 
-      const totalVolume = productDims.length * productDims.width * productDims.height
-        * (totalQtyByProduct.get(product) || 0);
-      const minPalletsNeeded = Math.max(1, Math.ceil(totalVolume / maxUsableVolume));
-      const locationsFreed = Math.max(0, currentPallets - minPalletsNeeded);
-      scores.set(product, { minPalletsNeeded, locationsFreed });
+      const totalQty = totalQtyByProduct.get(product) || 0;
+      if (totalQty <= 0) return;
+
+      // Per pallet (Urn) rekenen, niet per regel: staat hetzelfde artikel met
+      // twee regels op dezelfde pallet, dan is dat één pallet-plek.
+      const pallets = groupByUrn(rows, urnHeader);
+
+      // Grootste capaciteiten eerst: zo hebben we de minste pallets nodig.
+      const capacities = Array.from(pallets.values()).map(p => p.capacity).sort((a, b) => b - a);
+      let verzameld = 0;
+      let minPalletsNeeded = 0;
+      for (const cap of capacities) {
+        if (verzameld >= totalQty) break;
+        verzameld += cap;
+        minPalletsNeeded++;
+      }
+      minPalletsNeeded = Math.max(1, minPalletsNeeded);
+
+      const locationsFreed = Math.max(0, pallets.size - minPalletsNeeded);
+      scores.set(product, { minPalletsNeeded, locationsFreed, currentPallets: pallets.size });
     });
 
     return scores;
   }
 
-  // Fase 4 — actie per pallet: van elk artikel met "vrij te maken locaties"
-  // (Fase 3) wijzen we de pallets met de laagste vulgraad aan als "te legen"
-  // (voorraad overhevelen naar een andere pallet van hetzelfde artikel), de
-  // rest als "te behouden" (ontvangt die overgehevelde voorraad). Dit kan
-  // alleen betrouwbaar als van ALLE pallets van dat artikel de vulgraad
-  // bekend is — is er twijfel, dan raden we niet welke pallet het is en
-  // krijgen alle regels van dat artikel "onbekend". Vereist dat __fillInfo
-  // en __score al gezet zijn op de meegegeven rijen (zie applyFilter).
-  function computeConsolidationActions(rows, productHeader) {
+  // Bundelt regels van hetzelfde artikel per pallet (Urn): hoeveelheid bij
+  // elkaar optellen, capaciteit één keer meetellen (die hoort bij de locatie,
+  // niet bij de regel).
+  function groupByUrn(rows, urnHeader) {
+    const pallets = new Map();
+    rows.forEach(row => {
+      const urn = norm(row[urnHeader]);
+      if (!pallets.has(urn)) {
+        pallets.set(urn, { urn, qty: 0, capacity: row.__cap.capacity, rows: [] });
+      }
+      const pallet = pallets.get(urn);
+      pallet.qty += row.__cap.qty;
+      pallet.rows.push(row);
+    });
+    return pallets;
+  }
+
+  // Actie per pallet: welke pallets moeten leeg (Empty) en welke blijven staan
+  // (Keep)? We houden de pallets met het MEESTE erop aan — dat kost de minste
+  // ritten — en vullen die aan tot de totale hoeveelheid erin past. Wat dan
+  // overblijft kan leeg. Vereist dat __cap en __score al gezet zijn.
+  function computeConsolidationActions(rows, productHeader, urnHeader) {
     const rowsByProduct = new Map();
     rows.forEach(row => {
       const product = norm(row[productHeader]);
@@ -387,61 +529,36 @@
 
     rowsByProduct.forEach((productRows, product) => {
       const score = scoreByProduct.get(product);
-      if (!score || score.locationsFreed <= 0) {
-        productRows.forEach(row => { row.__action = null; }); // geen consolidatiewinst, geen actie nodig
-        return;
-      }
-
-      const allKnown = productRows.every(row => row.__fillInfo && row.__fillInfo.reason === 'ok');
-      if (!allKnown) {
+      if (!score) {
         productRows.forEach(row => { row.__action = 'onbekend'; });
         return;
       }
+      if (score.locationsFreed <= 0) {
+        productRows.forEach(row => { row.__action = null; }); // vol genoeg, geen kans
+        return;
+      }
 
-      // Nooit ALLE pallets van een artikel als "te legen" aanwijzen — er moet
-      // altijd minstens 1 pallet overblijven om de voorraad op te ontvangen.
-      const toEmptyCount = Math.min(score.locationsFreed, Math.max(productRows.length - 1, 0));
-      const sortedByFill = productRows.slice().sort((a, b) => a.__fillInfo.ratio - b.__fillInfo.ratio);
-      const toEmpty = new Set(sortedByFill.slice(0, toEmptyCount));
-      productRows.forEach(row => { row.__action = toEmpty.has(row) ? 'legen' : 'behouden'; });
-    });
-  }
+      const totalQty = totalQtyByProduct.get(product) || 0;
 
-  // Ruisreductie 2: producten met meer dan UNIFORM_STACKING_MIN_PALLETS
-  // pallets, waarvan alle pallets exact dezelfde hoeveelheid en dezelfde
-  // (afgeronde) vulgraad hebben, negeren — dat patroon wijst op een
-  // standaard, al-optimale stapelwijze, geen consolidatiekans. Bij twijfel
-  // (vulgraad van 1 of meer pallets onbekend) wordt een artikel NIET
-  // uitgesloten, want de aanname is dan niet hard te maken. Vereist dat
-  // row.__fillInfo al gezet is voor alle rijen van het artikel (zie
-  // applyFilter, dat dit voor baseRows doet vóór deze functie aan te roepen).
-  function computeUniformStackingProducts(productHeader, quantityHeader) {
-    const rowsByProduct = new Map();
-    baseRows.forEach(row => {
-      const product = norm(row[productHeader]);
-      if (!rowsByProduct.has(product)) rowsByProduct.set(product, []);
-      rowsByProduct.get(product).push(row);
-    });
+      // Volste pallets eerst behouden: dat kost de minste ritten, en voor een
+      // chauffeur is "de bijna-lege plekken worden geruimd" de logische regel.
+      const pallets = Array.from(groupByUrn(productRows, urnHeader).values())
+        .sort((a, b) => b.qty - a.qty);
+      const teBehouden = new Set();
+      let verzameld = 0;
+      for (const pallet of pallets) {
+        if (verzameld >= totalQty) break;
+        verzameld += pallet.capacity;
+        teBehouden.add(pallet);
+      }
+      // Altijd minstens 1 pallet laten staan om de voorraad op te ontvangen.
+      if (teBehouden.size === 0 && pallets.length) teBehouden.add(pallets[0]);
 
-    const uniform = new Set();
-    rowsByProduct.forEach((rows, product) => {
-      if ((palletCountByProduct.get(product) || 0) <= UNIFORM_STACKING_MIN_PALLETS) return;
-
-      const firstFill = rows[0].__fillInfo;
-      if (!firstFill || firstFill.reason !== 'ok') return;
-      const firstQty = norm(rows[0][quantityHeader]);
-      const firstPct = Math.round(firstFill.ratio * 100);
-
-      const allSame = rows.every(row => {
-        const fill = row.__fillInfo;
-        return fill && fill.reason === 'ok'
-          && norm(row[quantityHeader]) === firstQty
-          && Math.round(fill.ratio * 100) === firstPct;
+      pallets.forEach(pallet => {
+        const actie = teBehouden.has(pallet) ? 'behouden' : 'legen';
+        pallet.rows.forEach(row => { row.__action = actie; });
       });
-      if (allSame) uniform.add(product);
     });
-
-    return uniform;
   }
 
   function resetUI() {
@@ -455,11 +572,11 @@
     outputColumns = [];
     palletCountByProduct = new Map();
     totalQtyByProduct = new Map();
-    locationSetByProduct = new Map();
     scoreByProduct = new Map();
+    mixedPalletUrns = new Set();
     noiseExcludedRowCount = 0;
     chitaExcludedRowCount = 0;
-    uniformStackingProducts = new Set();
+    observedOverrideCount = 0;
     productGroupHeader = null;
     selectedProductGroups = new Set();
     productGroupSection.style.display = 'none';
@@ -560,28 +677,31 @@
     }
 
     // Per product het aantal unieke pallets (Urn's) op bulklocaties tellen,
-    // plus (t.b.v. Fase 3) de totale hoeveelheid en de set locaties waar het
-    // artikel nu op staat — nodig om straks het consolidatiepotentieel te
-    // berekenen.
+    // plus de totale hoeveelheid — nodig om het consolidatiepotentieel te
+    // berekenen. Tegelijk bijhouden welke pallets gemengd zijn (meerdere
+    // artikelen op dezelfde Urn): daarvan is de capaciteit niet aan één
+    // artikel toe te rekenen, dus die krijgen geen advies.
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');
     const urnHeader = originalHeaders.find(h => normKey(h) === 'urn');
-    const locationHeaderForTotals = originalHeaders.find(h => normKey(h) === 'location code');
     const quantityHeaderForTotals = originalHeaders.find(h => normKey(h) === 'quantity');
     const palletSetsByProduct = new Map();
+    const productsByUrn = new Map();
     totalQtyByProduct = new Map();
-    locationSetByProduct = new Map();
     baseRows.forEach(row => {
       const product = norm(row[productHeader]);
       const urn = norm(row[urnHeader]);
       if (!palletSetsByProduct.has(product)) palletSetsByProduct.set(product, new Set());
       palletSetsByProduct.get(product).add(urn);
 
+      if (!productsByUrn.has(urn)) productsByUrn.set(urn, new Set());
+      productsByUrn.get(urn).add(product);
+
       totalQtyByProduct.set(product, (totalQtyByProduct.get(product) || 0) + (Number(row[quantityHeaderForTotals]) || 0));
-      if (!locationSetByProduct.has(product)) locationSetByProduct.set(product, new Set());
-      locationSetByProduct.get(product).add(normKey(row[locationHeaderForTotals]));
     });
     palletCountByProduct = new Map();
     palletSetsByProduct.forEach((set, product) => palletCountByProduct.set(product, set.size));
+    mixedPalletUrns = new Set();
+    productsByUrn.forEach((products, urn) => { if (products.size > 1) mixedPalletUrns.add(urn); });
 
     // Product Group filter opbouwen: alleen tonen als de kolom aanwezig is in
     // dit bestand. Waarden komen uit de data zelf, dus dit past zich vanzelf
@@ -631,54 +751,59 @@
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');
     const locationHeader = originalHeaders.find(h => normKey(h) === 'location code');
     const quantityHeader = originalHeaders.find(h => normKey(h) === 'quantity');
+    const urnHeader = originalHeaders.find(h => normKey(h) === 'urn');
 
-    // Vulgraad vooraf voor ALLE basisregels berekenen (niet pas na filteren)
-    // — computeUniformStackingProducts hieronder moet naar alle pallets van
-    // een artikel kunnen kijken, los van de huidige UI-filters.
+    // Capaciteit vooraf voor ALLE basisregels berekenen (niet pas na filteren)
+    // — de consolidatiescore moet naar alle pallets van een artikel kunnen
+    // kijken, los van de huidige UI-filters.
+    observedOverrideCount = 0;
     baseRows.forEach(row => {
-      row.__fillInfo = computeFillRatio(row, productHeader, locationHeader, quantityHeader);
+      row.__cap = computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader);
     });
 
-    scoreByProduct = computeConsolidationScores();
-    uniformStackingProducts = computeUniformStackingProducts(productHeader, quantityHeader);
+    scoreByProduct = computeConsolidationScores(productHeader, urnHeader);
 
     resultRows = baseRows.filter(row => {
       const product = norm(row[productHeader]);
-      if (uniformStackingProducts.has(product)) return false; // ruisreductie 2
       if (hideSinglePallet.checked) {
         if ((palletCountByProduct.get(product) || 0) < 2) return false;
+      }
+      // Alleen echte kansen tonen: artikelen waar consolideren daadwerkelijk
+      // een locatie vrijmaakt. Artikelen met een onbekende capaciteit vallen
+      // hier ook weg, want daarvan is geen kans aan te tonen.
+      if (onlyOpportunities.checked) {
+        const score = scoreByProduct.get(product);
+        if (!score || score.locationsFreed <= 0) return false;
       }
       if (productGroupHeader && !selectedProductGroups.has(norm(row[productGroupHeader]))) return false;
       return true;
     });
 
-    // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan —
-    // Fase 3), dan op product (zodat alle pallets van hetzelfde artikel bij
-    // elkaar staan), en als laatste op vulgraad oplopend — zo staan binnen
-    // een artikel de pallets met de laagste vulgraad (de te legen pallets,
-    // Fase 4) vanzelf boven de te behouden pallets. Artikelen zonder bekende
-    // score (-1) staan onderaan; pallets zonder bekende vulgraad staan als
-    // laatste binnen hun artikel.
+    // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan),
+    // dan op product (zodat alle pallets van hetzelfde artikel bij elkaar
+    // staan), en als laatste op hoeveelheid oplopend — zo staan binnen een
+    // artikel de bijna-lege pallets (de te legen pallets) vanzelf boven de te
+    // behouden pallets, wat overeenkomt met hoe Empty/Keep bepaald wordt.
+    // Artikelen zonder bekende score (-1) staan onderaan.
     resultRows = resultRows.slice().sort((a, b) => {
       const pa = norm(a[productHeader]), pb = norm(b[productHeader]);
       const freedA = scoreByProduct.has(pa) ? scoreByProduct.get(pa).locationsFreed : -1;
       const freedB = scoreByProduct.has(pb) ? scoreByProduct.get(pb).locationsFreed : -1;
       if (freedA !== freedB) return freedB - freedA;
       if (pa !== pb) return pa < pb ? -1 : 1;
-      const fa = a.__fillInfo && a.__fillInfo.reason === 'ok' ? a.__fillInfo.ratio : Infinity;
-      const fb = b.__fillInfo && b.__fillInfo.reason === 'ok' ? b.__fillInfo.ratio : Infinity;
-      if (fa !== fb) return fa - fb;
+      const qa = a.__cap && a.__cap.reason === 'ok' ? a.__cap.qty : Infinity;
+      const qb = b.__cap && b.__cap.reason === 'ok' ? b.__cap.qty : Infinity;
+      if (qa !== qb) return qa - qb;
       const la = norm(a[locationHeader]), lb = norm(b[locationHeader]);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
-    // Consolidatiescore per regel vastleggen voor weergave/export (vulgraad
-    // staat al op de rij, zie hierboven), en daarna pas de actie per pallet
-    // bepalen (Fase 4) — die heeft zowel __score als __fillInfo nodig.
+    // Consolidatiescore per regel vastleggen voor weergave/export, en daarna
+    // pas de actie per pallet bepalen — die heeft zowel __score als __cap nodig.
     resultRows.forEach(row => {
       row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
     });
-    computeConsolidationActions(resultRows, productHeader);
+    computeConsolidationActions(resultRows, productHeader, urnHeader);
 
     // Zoekfilter als laatste stap: zoekt in exact de kolommen die ook in de
     // tabel te zien zijn (Location Code, Product Name, Quantity, Urn). Pas
@@ -697,6 +822,7 @@
     renderPreview();
   }
   hideSinglePallet.addEventListener('change', applyFilter);
+  onlyOpportunities.addEventListener('change', applyFilter);
   searchInput.addEventListener('input', applyFilter);
 
   function renderStats() {
@@ -723,23 +849,49 @@
     if (!referenceDataReady) {
       stats.push({ label: 'Vulgraad', num: 'referentiebestanden niet geladen' });
     } else {
+      // Kernmaat bovenaan: hoeveel plekken maakt deze lijst daadwerkelijk vrij?
+      // Optellen per uniek artikel, niet per regel — anders telt hetzelfde
+      // artikel dubbel mee via zijn meerdere pallets.
+      const productsInResult = new Set(resultRows.map(r => norm(r[productHeader])));
+      let totalLocationsFreed = 0, productsWithKnownScore = 0;
+      productsInResult.forEach(p => {
+        const score = scoreByProduct.get(p);
+        if (score) { totalLocationsFreed += score.locationsFreed; productsWithKnownScore++; }
+      });
+      const toEmptyCount = resultRows.filter(r => r.__action === 'legen').length;
+      stats.unshift(
+        { label: 'Vrij te maken pallet-plekken', num: totalLocationsFreed },
+        { label: 'Pallets leeghalen om dat te bereiken', num: toEmptyCount }
+      );
+
+      stats.push({
+        label: 'Artikelen met een aantoonbare kans',
+        num: `${productsWithKnownScore} / ${productsInResult.size}`,
+      });
+
+      // Capaciteitsdekking uitsplitsen naar reden, zodat in de statistieken
+      // zelf te zien is WAAROM regels onbekend zijn — zonder devtools.
       const reasonCounts = {};
       resultRows.forEach(r => {
-        reasonCounts[r.__fillInfo.reason] = (reasonCounts[r.__fillInfo.reason] || 0) + 1;
+        reasonCounts[r.__cap.reason] = (reasonCounts[r.__cap.reason] || 0) + 1;
       });
       const known = reasonCounts['ok'] || 0;
-      stats.push({ label: 'Vulgraad bekend (van huidig resultaat)', num: `${known} / ${resultRows.length}` });
+      stats.push({ label: 'Capaciteit bekend (van huidig resultaat)', num: `${known} / ${resultRows.length}` });
       if (known) {
-        const avgFill = resultRows
-          .filter(r => r.__fillInfo.reason === 'ok')
-          .reduce((sum, r) => sum + r.__fillInfo.ratio, 0) / known;
+        const okRows = resultRows.filter(r => r.__cap.reason === 'ok');
+        const avgFill = okRows.reduce((sum, r) => sum + r.__cap.ratio, 0) / known;
+        const totalRest = okRows.reduce((sum, r) => sum + r.__cap.restruimte, 0);
         stats.push({ label: 'Gemiddelde vulgraad (bekend)', num: `${Math.round(avgFill * 100)}%` });
+        stats.push({ label: 'Totale restruimte in resultaat (stuks)', num: totalRest });
       }
       const REASON_LABELS = {
-        'product-onbekend': 'Waarvan: productafmetingen niet in referentiebestand',
-        'locatie-onbekend': 'Waarvan: locatieafmetingen niet in referentiebestand',
-        'aantal-ongeldig': 'Waarvan: aantal ontbreekt/ongeldig',
-        'locatie-te-laag': 'Waarvan: locatie te laag na pallet-aftrek',
+        'product-afmetingen-onbetrouwbaar': 'Onbekend: productafmetingen ontbreken of zijn placeholder',
+        'locatie-onbruikbaar': 'Onbekend: locatie of palletsoort onbruikbaar',
+        'gemengde-pallet': 'Onbekend: meerdere artikelen op dezelfde pallet',
+        'past-niet-op-pallet': 'Onbekend: product past niet op deze pallet',
+        'product-te-hoog': 'Onbekend: product hoger dan de stapelruimte',
+        'locatie-te-laag': 'Onbekend: locatie te laag na pallet-aftrek',
+        'aantal-ongeldig': 'Onbekend: aantal ontbreekt of is ongeldig',
       };
       Object.keys(REASON_LABELS).forEach(reasonKey => {
         if (reasonCounts[reasonKey]) {
@@ -747,40 +899,30 @@
         }
       });
 
-      // Vrij te maken locaties optellen per uniek artikel (niet per regel,
-      // anders telt hetzelfde artikel dubbel mee via zijn meerdere pallets).
-      const productsInResult = new Set(resultRows.map(r => norm(r[productHeader])));
-      let totalLocationsFreed = 0, productsWithKnownScore = 0;
-      productsInResult.forEach(p => {
-        const score = scoreByProduct.get(p);
-        if (score) { totalLocationsFreed += score.locationsFreed; productsWithKnownScore++; }
-      });
-      stats.push({
-        label: 'Vrij te maken locaties (huidig resultaat)',
-        num: `${totalLocationsFreed} (${productsWithKnownScore}/${productsInResult.size} artikelen bekend)`,
-      });
-
-      // Fase 4: hoeveel pallets zijn concreet aangewezen om te legen, en bij
-      // hoeveel artikelen kon dat niet (vulgraad van 1+ pallets onbekend).
-      const toEmptyCount = resultRows.filter(r => r.__action === 'legen').length;
-      const unknownActionProducts = new Set(
-        resultRows.filter(r => r.__action === 'onbekend').map(r => norm(r[productHeader]))
-      ).size;
-      stats.push({
-        label: 'Pallets aangewezen om te legen (Actie)',
-        num: unknownActionProducts
-          ? `${toEmptyCount} (+${unknownActionProducts} artikelen onbekend)`
-          : `${toEmptyCount}`,
-      });
-
-      // Ruisreductie 2 zichtbaar maken: hoeveel artikelen (en dus pallets)
-      // zijn genegeerd omdat ze al gelijkmatig/optimaal gestapeld staan.
-      if (uniformStackingProducts.size) {
-        let uniformPalletCount = 0;
-        uniformStackingProducts.forEach(p => { uniformPalletCount += palletCountByProduct.get(p) || 0; });
+      // Zelfcorrectie zichtbaar maken: hoe vaak stond er méér op een pallet
+      // dan volgens de afmetingen past? Dat is een signaal over datakwaliteit,
+      // niet iets om stil te houden.
+      if (observedOverrideCount) {
         stats.push({
-          label: `Genegeerd: gelijkmatige stapeling (>${UNIFORM_STACKING_MIN_PALLETS} pallets, zelfde aantal/vulgraad)`,
-          num: `${uniformStackingProducts.size} artikelen (${uniformPalletCount} pallets)`,
+          label: 'Capaciteit bijgesteld op wat er werkelijk op staat',
+          num: `${observedOverrideCount} pallets`,
+        });
+      }
+
+      // Kwaliteit van de referentiebestanden zelf — de bron van bijna alle
+      // "onbekend" hierboven.
+      if (refStats) {
+        const p = refStats.products, l = refStats.locations;
+        stats.push({
+          label: 'products.xlsx bruikbaar na plausibiliteitstoets',
+          num: `${productDimsById.size} / ${p.total}`,
+        });
+        if (p.rejected.placeholder) {
+          stats.push({ label: 'Waarvan afgekeurd: placeholder-afmeting 1×1×1 mm', num: p.rejected.placeholder });
+        }
+        stats.push({
+          label: 'locations.xlsx bruikbaar na plausibiliteitstoets',
+          num: `${locationInfoByCode.size} / ${l.total}`,
         });
       }
     }
@@ -792,15 +934,23 @@
     ).join('');
   }
 
-  // Vulgraad als leesbare tekst voor tabel/export: percentage, of "onbekend"
-  // als afmetingen van product of locatie ontbreken.
-  function formatFillRatio(fillInfo) {
-    if (!fillInfo || fillInfo.ratio === null || fillInfo.ratio === undefined) return 'onbekend';
-    return `${Math.round(fillInfo.ratio * 100)}%`;
+  // Vulgraad als leesbare tekst voor tabel/export: hoeveel procent van de
+  // palletcapaciteit is bezet, of "onbekend" als de capaciteit niet te
+  // bepalen was.
+  function formatFillRatio(cap) {
+    if (!cap || cap.reason !== 'ok') return 'onbekend';
+    return `${Math.round(cap.ratio * 100)}%`;
   }
 
-  // Vrij te maken locaties (Fase 3) als leesbare tekst: "onbekend" als er geen
-  // score berekend kon worden (zie computeConsolidationScores).
+  // Restruimte in stuks — het getal waar een reachtruck-chauffeur direct iets
+  // mee kan: hoeveel kan er nog bij op deze pallet?
+  function formatRestruimte(cap) {
+    if (!cap || cap.reason !== 'ok') return 'onbekend';
+    return String(cap.restruimte);
+  }
+
+  // Vrij te maken locaties als leesbare tekst: "onbekend" als er geen score
+  // berekend kon worden (zie computeConsolidationScores).
   function formatLocationsFreed(score) {
     if (!score) return 'onbekend';
     return String(score.locationsFreed);
@@ -829,7 +979,7 @@
     const trClass = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60';
 
     const showFillColumn = referenceDataReady;
-    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Vrij te maken locaties', 'Actie'] : []);
+    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Restruimte', 'Vrij te maken locaties', 'Actie'] : []);
     const thead = '<thead><tr>' + headers.map(h => `<th class="${thClass}">${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
@@ -837,7 +987,8 @@
         return `<td class="${tdClass}">${val === undefined || val === null ? '' : String(val)}</td>`;
       });
       if (showFillColumn) {
-        cells.push(`<td class="${tdClass}">${formatFillRatio(row.__fillInfo)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatFillRatio(row.__cap)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatRestruimte(row.__cap)}</td>`);
         cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
         // "Legen"-pallets extra opvallend (geel accent), zodat ze in de
         // preview meteen te herkennen zijn zonder de tekst te moeten lezen.
@@ -866,12 +1017,15 @@
       const exportColumns = outputColumns.concat(
         referenceDataReady ? [
           { label: 'Vulgraad', header: null, isFillColumn: true },
+          { label: 'Restruimte', header: null, isRestColumn: true },
           { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
           { label: 'Actie', header: null, isActionColumn: true },
         ] : []
       );
       const valueFor = (row, c) => c.isFillColumn
-        ? formatFillRatio(row.__fillInfo)
+        ? formatFillRatio(row.__cap)
+        : c.isRestColumn
+        ? formatRestruimte(row.__cap)
         : c.isScoreColumn
         ? formatLocationsFreed(row.__score)
         : c.isActionColumn
@@ -888,8 +1042,9 @@
         'Urn': { min: 12, max: 20 },
         'Product Name': { min: 40, max: 90 },
         'Vulgraad': { min: 10, max: 12 },
+        'Restruimte': { min: 11, max: 14 },
         'Vrij te maken locaties': { min: 12, max: 22 },
-        'Actie': { min: 12, max: 40 },
+        'Actie': { min: 8, max: 12 },
       };
       sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };

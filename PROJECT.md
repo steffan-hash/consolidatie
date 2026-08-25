@@ -7,16 +7,28 @@ bulklocaties staan — kandidaten om fysiek samen te voegen tot 1 pallet.
 Persoonlijk project. Draait op GitHub voor version control, o.a. omdat het
 op meerdere plekken (thuis/werk) wordt bewerkt.
 
-## Status
-Techkeuze gemaakt: één losse `index.html` + `scripts/script.js`, geen
-build/install-stap. Excel-verwerking draait volledig client-side in de
-browser via SheetJS (inlezen) en ExcelJS (opmaak/output van het resultaat),
-beide via CDN. Geen Python/Streamlit.
+## Waarom deze tool bestaat (het echte doel)
+De tool moet klaar zijn vóór de piek: de goederen voor het nieuwe seizoen
+komen binnen terwijl er nog weinig verkocht wordt. Vorig jaar moest daarvoor
+een **extern magazijn met 7000 gevulde europallet-plekken** bijgehuurd
+worden. Elke pallet-plek die intern vrijgemaakt kan worden vóór die instroom
+is dus directe winst.
 
-De tool is functioneel af (upload → filter → export). Tot nu toe gebouwd
-buiten deze repo om (los mapje op het bureaublad); vanaf deze sessie is dat
-overgezet naar deze repo zodat de vaste werkwijze (git, Log.md, LESSONS.md)
-erop van toepassing is.
+Daarom is **"vrij te maken pallet-plekken" de kernmaat** van deze tool — niet
+de vulgraad, niet het aantal regels. Alles in de UI en de export is daarop
+gericht: hoeveel plekken levert deze lijst op, en welke pallets moeten
+daarvoor leeg.
+
+## Status
+Techkeuze: één losse `index.html` + `scripts/script.js`, geen build/install-
+stap. Excel-verwerking draait volledig client-side in de browser via SheetJS
+(inlezen) en ExcelJS (opmaak/output van het resultaat), beide via CDN. Geen
+Python/Streamlit. Live via GitHub Pages.
+
+De tool is functioneel af (upload → filter → export). Het rekenmodel is in
+augustus 2026 herbouwd van een volumeratio naar **capaciteit in stuks** (zie
+"Model 3.0" hieronder) — het oude model rekende structureel verkeerd en liet
+placeholder-data bovenaan de werklijst komen.
 
 ## Belangrijkste commando's
 ```
@@ -56,48 +68,100 @@ start index.html
 - **Consolidatie-kandidaat** = een artikel dat op 2 of meer unieke pallets
   (verschillende `Urn`-waarden) op een Bulk Location staat. Artikelen op
   precies 1 pallet worden standaard verborgen (instelbaar via checkbox).
-- Het exportbestand bevat altijd maar 4 vaste kolommen (niet instelbaar):
-  Location Code, Product Name (= `Description` uit de bron), Quantity, Urn
-  — de rest van de brondata is ruis voor het fysiek consolideren van
-  pallets.
-- Resultaat wordt gesorteerd op product, dan locatie — zodat alle pallets
-  van hetzelfde artikel bij elkaar staan in de export.
+- Het exportbestand bevat 4 vaste kolommen uit de bron (niet instelbaar):
+  Location Code, Product Name (= `Description` uit de bron), Quantity, Urn —
+  de rest van de brondata is ruis voor het fysiek consolideren van pallets.
+  Daarnaast 4 berekende kolommen: Vulgraad, Restruimte, Vrij te maken
+  locaties en Actie (zie Model 3.0).
+- Resultaat wordt gesorteerd op vrij te maken locaties (meeste winst
+  bovenaan), dan op product zodat alle pallets van hetzelfde artikel bij
+  elkaar staan, en binnen een artikel op hoeveelheid oplopend — zodat de
+  pallets die leeg moeten (Empty) bovenaan staan.
 - Printopmaak van de export staat vast op A4 liggend, geschaald naar 1
   pagina breed.
-- **Ruisreductie (op verzoek):** twee automatische uitsluitingen, zodat het
-  resultaat een gerichte werklijst is i.p.v. duizenden regels. (1) Producten
-  met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkingsmateriaal)
-  worden helemaal genegeerd — niet instelbaar, staat als `NOISE_PRODUCT_
-  KEYWORDS` in `scripts/script.js`. (2) Een artikel op meer dan 10 pallets
-  (`UNIFORM_STACKING_MIN_PALLETS`), waarvan alle pallets exact dezelfde
-  hoeveelheid én (afgeronde) vulgraad hebben, wordt ook genegeerd — dat
-  patroon wijst op een standaard, al-optimale stapelwijze, geen
-  consolidatiekans. Bij twijfel (vulgraad van 1+ pallets onbekend) wordt een
-  artikel niet uitgesloten. (3) Locaties waarvan de `Location Code` "CHITA"
-  bevat (bijv. `CHITA_AM1`, `CHITA_DOOS10`) worden genegeerd — dat zijn geen
-  gewone bulklocaties in het magazijnrek, staat als `NOISE_LOCATION_KEYWORD`
-  in `scripts/script.js`. Alle drie tellingen zijn zichtbaar in de
-  statistieken (niet stilzwijgend).
+- **Ruisreductie:** (1) Producten met "DOOS", "BOX" of "TOP" als los woord in
+  de naam (verpakkingsmateriaal) worden helemaal genegeerd — staat als
+  `NOISE_PRODUCT_KEYWORDS` in `scripts/script.js`. (2) Locaties waarvan de
+  `Location Code` "CHITA" bevat (bijv. `CHITA_AM1`, `CHITA_DOOS10`) worden
+  genegeerd — dat zijn geen gewone bulklocaties in het magazijnrek
+  (`NOISE_LOCATION_KEYWORD`). (3) Pallets waarop meerdere artikelen door
+  elkaar staan (dezelfde `Urn`, verschillende producten) krijgen geen advies:
+  de capaciteit is dan niet aan één artikel toe te rekenen. Alle uitsluitingen
+  zijn zichtbaar in de statistieken (niet stilzwijgend).
+- **Vervallen regel:** de eerdere ruisreductie "gelijkmatige stapeling" (een
+  artikel op >10 pallets met overal dezelfde hoeveelheid én vulgraad negeren)
+  is in 3.0 geschrapt. Die bestond alleen om artikelen te verbergen die het
+  oude volumemodel onterecht als kans aanmerkte. Met een capaciteitsmodel valt
+  een volle pallet vanzelf weg (0 vrij te maken plekken), dus de regel zou nu
+  echte kansen gaan verbergen. Dit sluit de openstaande vraag uit de sessies
+  van 24/25 augustus af.
+- **Alleen echte kansen tonen** (checkbox, standaard aan): artikelen waar
+  consolideren geen enkele plek vrijmaakt, of waar de capaciteit onbekend is,
+  staan niet in de lijst. Uitzetten laat alles zien.
 
-## Roadmap 2.0 — slimme consolidatie
-Huidige versie telt alleen *hoeveel* pallets een artikel inneemt. 2.0 moet
-rekening houden met hoe vol/leeg die pallets écht staan, zodat de
-reachtruck-planning gericht kan worden op consolidaties die ook
-daadwerkelijk ruimte opleveren — niet op artikelen die toevallig op 2
-pallets staan maar al bijna vol zijn.
+## Model 3.0 — capaciteit in stuks (huidige aanpak)
+Versie 2.0 rekende de vulgraad uit als volume-tegen-volume. Dat bleek
+structureel verkeerd: een pallet wordt *gestapeld*, niet volgegoten. Een
+artikel van 980 mm lang laat zich niet halveren om de laatste 220 mm te
+vullen. Gemeten gevolg: 3 stuks Eurom Flameheater kwamen uit op 48% "vol",
+terwijl er fysiek precies 3 op passen — de pallet was 100% vol en werd dus
+onterecht als kans op de werklijst gezet.
+
+Daar kwam bij dat een derde van `products.xlsx` (10.401 van 29.996) op
+placeholder-afmetingen 1×1×1 mm staat. Zo'n product past volgens een
+volumeberekening altijd op één pallet, kreeg dus de **maximale** score bij
+"vrij te maken locaties" en een vulgraad van 0% — en kwam daarmee bovenaan de
+gesorteerde lijst. De bovenkant van de werklijst werd zo gevuld door
+ontbrekende data i.p.v. echte kansen. Dat is de belangrijkste reden dat het
+resultaat onbruikbaar aanvoelde.
+
+**De kern van 3.0: capaciteit in stuks per pallet.**
+```
+stuks per laag = beste van de twee liggingen op de palletvoetprint
+aantal lagen   = bruikbare stapelhoogte / producthoogte
+capaciteit     = stuks per laag × aantal lagen   (beide naar beneden afgerond)
+```
+Daaruit volgt alles: vulgraad (`aantal / capaciteit`), **restruimte in stuks**
+(het getal waar een chauffeur iets mee kan), het minimaal benodigde aantal
+pallets, en dus het aantal vrij te maken plekken.
 
 **Vastgestelde aannames (product owner):**
 - Magazijn-specifiek: deze tool wordt maar in 1 magazijn gebruikt, dus
   locatie-afmetingen wijzigen zelden.
-- Bulklocaties verschillen sterk van afmeting per locatie — geen
-  standaardmaat, dus per Location Code de eigen afmetingen gebruiken.
-- Producten worden vrijwel altijd rechtop opgeslagen — vaste oriëntatie,
-  geen rekening houden met roteren/kantelen van een product.
-- Gewicht is geen harde grens — alleen volume (ruimte) telt mee.
-- Veel producten zitten in een omdoos, maar die afmetingen zijn niet
-  bekend. Bewuste keuze: omdoos negeren bij de berekening, en in plaats
-  daarvan een vaste marge aanhouden op de vulgraad (pallet iets eerder
-  als "vol" beschouwen dan de kale volumeberekening aangeeft).
+- Producten worden vrijwel altijd rechtop opgeslagen — de hoogte staat dus
+  vast, maar in het platte vlak mag een product een kwartslag gedraaid worden
+  (de tool neemt de beste van die twee liggingen).
+- Gewicht is geen harde grens — alleen ruimte telt mee. Bevestigd in de data:
+  `Maximum Weight` staat voor alle 9013 locaties op dezelfde waarde en bevat
+  dus geen informatie.
+- **Stapelhoogte: in de praktijk niet hoger dan ongeveer 2 meter** — een
+  natuurlijke grens, geen WMS-regel. Locaties die hoger zijn leveren dus geen
+  extra capaciteit op (`MAX_STAPELHOOGTE_MM`).
+- **De afmetingen in `products.xlsx` zijn die van de verkoopverpakking.**
+  Verkoopt Toppy iets als set, dan staat dat in de productnaam ("... - 8
+  stuks") en zijn de afmetingen die van de hele set. `Quantity` telt dus
+  dezelfde eenheid als waar de afmetingen bij horen — geen omrekenfactor
+  nodig. Hierdoor is de oude omdoos-marge van 15% vervallen: die was een
+  dubbele veiligheidsaftrek die het beeld alleen vertekende.
+- **Palletvoetprint komt uit de kolom `Urn Type`, niet uit de Length/Width van
+  de locatie.** Die laatste spreken elkaar tegen (122 locaties met
+  `Urn Type = Euro Pallet` staan als 1800 mm breed geregistreerd) terwijl
+  `Urn Type` consistent is: Euro Pallet 7869, Blok Pallet 730, 180 Pallet 320,
+  270 Pallet 90, Hottub 15. Zo is het model niet meer gevoelig voor precies de
+  datafouten die eerder steeds handmatig gerepareerd zijn. Alleen de
+  locatie**hoogte** komt nog uit de locatie zelf.
+- **Referentiedata wordt eerst gewantrouwd** (plausibiliteitstoets). Producten
+  met 1×1×1, ontbrekende, absurd kleine of absurd grote afmetingen worden
+  afgekeurd; locaties met een onmogelijke hoogte of onbekende palletsoort ook.
+  Afgekeurd = "onbekend", en onbekend doet **niet** mee aan de rangschikking.
+  Gemeten resultaat: 18.220 van 29.996 producten en 9006 van 9039 locaties
+  blijven bruikbaar.
+- **Zelfcorrectie op de waarneming:** staat er méér op een pallet dan volgens
+  de berekening past, dan is de berekening fout (of er wordt ruimer gestapeld
+  dan aangenomen) — niet de werkelijkheid. Dan wordt de waargenomen
+  hoeveelheid de capaciteit. Dat is conservatief (levert nooit een valse kans
+  op) en het aantal keer dat het gebeurt staat in de statistieken als
+  signaal over de datakwaliteit.
 - Referentiedata (locatie- en productafmetingen) komt uit een los
   WMS/ERP-bestand en wordt als vaste bestanden in deze repo gezet (map
   nog te bepalen, bijv. `data/reference/`) — niet elke sessie opnieuw
@@ -112,85 +176,85 @@ pallets staan maar al bijna vol zijn.
 vast in de repo en worden door de tool zelf ingeladen (fetch, geen
 upload-stap). Koppelveld producten: `Product ID` ↔ `Product` in de
 voorraadexport. Koppelveld locaties: `Location` ↔ `Location Code`.
-Bevestigd: `Quantity` in de voorraadexport is altijd losse eenheden,
-rechtstreeks te vermenigvuldigen met de productafmetingen (geen
-dozen/verpakkingsfactor nodig). `products.xlsx` is bewust een subset
-(niet elk product staat erin) — ontbrekende afmetingen geven "onbekend",
-geen foutmelding of gok.
+Uit `locations.xlsx` gebruikt de tool alleen `Location`, `Height` en
+`Urn Type` — de Length/Width worden bewust genegeerd (zie aannames).
+Ontbrekende of onbetrouwbare afmetingen geven "onbekend", geen gok.
 Let op: fetch() van deze bestanden werkt alleen als de pagina via een
 webserver bediend wordt (dus via de GitHub Pages-URL), niet bij lokaal
 openen door dubbelklikken op `index.html`. Voor lokaal testen is een
 kleine lokale server nodig.
 
-**Fase 2 — Vulgraad per pallet (gebouwd)**
-Per regel: (aantal × productvolume) ÷ (bruikbare locatie-inhoud) =
-vulgraad %. Bruikbare locatie-inhoud = locatielengte × locatiebreedte ×
-(locatiehoogte − 200 mm voor de europallet zelf) × (1 − 15% marge voor de
-onbekende omdoos). Beide getallen (200 mm, 15%) zijn een inschatting, geen
-gemeten waarde — staan als `PALLET_HOOGTE_MM` en `OMDOOS_MARGE` bovenaan
-`scripts/script.js` en zijn daar aan te passen als de praktijk daar
-aanleiding toe geeft.
+**Fase 2 — Capaciteit per pallet (gebouwd, 3.0)**
+Per regel wordt de capaciteit in stuks berekend volgens de formule bovenaan
+dit hoofdstuk. Getoond worden: **Vulgraad** (% van de capaciteit),
+**Restruimte** (hoeveel stuks er nog bij kunnen) en de reden als het niet
+lukt. Instelbaar bovenaan `scripts/script.js`: `PALLET_HOOGTE_MM` (200),
+`MAX_STAPELHOOGTE_MM` (2000), `PALLET_FOOTPRINTS` en de vier
+plausibiliteitsgrenzen.
 
-Zichtbaar als kolom in de preview én in het geëxporteerde .xlsx-bestand.
-De statistieken splitsen "onbekend" uit naar reden (product niet in
-`products.xlsx`, locatie niet in `locations.xlsx`, ongeldig aantal, of
-locatie te laag na de pallet-aftrek) — zo is in de tool zelf te zien
-wáárom iets onbekend is, zonder de browserconsole nodig te hebben.
-(Extra: bij het laden logt de tool ook een samenvatting in de
-browserconsole (F12 → Console), voor verdere diagnose.)
+De statistieken splitsen "onbekend" uit naar reden (placeholder-afmetingen,
+locatie/palletsoort onbruikbaar, gemengde pallet, product past niet op de
+pallet, product te hoog, ongeldig aantal) én tonen de kwaliteit van de
+referentiebestanden zelf. Zo is in de tool te zien wáárom iets onbekend is,
+zonder de browserconsole nodig te hebben. (Bij het laden logt de tool ook een
+samenvatting in de console, F12 → Console.)
 
-Dekking hangt volledig af van hoe compleet `products.xlsx` is. Bij de
-eerste test (276 producten, een subset) was vrijwel alles "onbekend".
-Na een volledigere export (2856 producten) is dat gemeten op de
-voorbeelddata: ~30% van de resultaatregels bekend, en van de unieke
-artikelen in het resultaat stond nog 67% niet in `products.xlsx` — dat is
-dus een dekkingsvraagstuk in het bronbestand, geen bug in de tool. Als de
-dekking omhoog moet, is een vollediger productbestand (zonder filter op
-bijv. "actief") de aangewezen oplossing.
+**Fase 3 — Vrij te maken plekken (gebouwd, 3.0)**
+Per artikel wordt bepaald hoeveel pallets er minimaal nodig zijn: capaciteiten
+van groot naar klein optellen tot de totale hoeveelheid erin past. Het
+verschil met het huidige aantal pallets is **"Vrij te maken locaties"** — de
+kernmaat van de tool. Er wordt per **pallet (Urn)** gerekend, niet per regel,
+zodat een artikel met twee regels op dezelfde pallet niet dubbel telt.
+Artikelen waarvan ook maar één pallet een onbekende capaciteit heeft krijgen
+géén score: dan is niet aan te tonen dat het echt in minder pallets past.
+Dit is ook de sortering van het resultaat (meeste winst bovenaan).
 
-**Fase 3 — Consolidatiepotentieel (gebouwd)**
-Per artikel op 2+ pallets: totaal benodigd volume (productvolume × totale
-hoeveelheid over al zijn pallets) afgezet tegen de grootste bruikbare
-locatie-inhoud onder de locaties die het artikel al gebruikt → minimaal
-aantal pallets nodig (`Math.ceil`, met een ondergrens van 1). Verschil met
-het huidige aantal pallets = aantal locaties dat écht vrijgemaakt kan
-worden ("Vrij te maken locaties" — nooit negatief).
-Dit is nu de sortering van het resultaat (meeste winst bovenaan i.p.v.
-alfabetisch), met productnaam en locatie als tiebreaker. Zichtbaar als
-kolom in preview én export, en als totaal in de statistieken. Hangt af
-van dezelfde referentiedata als de vulgraad (Fase 2) — "onbekend" als
-productafmetingen ontbreken, of als geen van de gebruikte locaties
-bruikbare afmetingen heeft. Nog niet end-to-end getest in een echte
-browser (geen Node/Python op deze machine, geen lokale voorraadexport
-beschikbaar) — wel zorgvuldig nagelopen tegen de bestaande vulgraadlogica,
-die dezelfde formule en referentiedata hergebruikt.
+**Fase 4 — Werklijst voor de reachers (gebouwd, 3.0)**
+Kolom **Actie** geeft per pallet aan wat er moet gebeuren: **Empty**
+(leeghalen, voorraad overhevelen) of **Keep** (blijft staan, ontvangt de
+voorraad). De pallets met het **meeste** erop blijven staan — dat kost de
+minste ritten — en worden aangevuld tot de totale hoeveelheid erin past; wat
+dan overblijft kan leeg. Binnen elk artikel staan de Empty-pallets bovenaan.
+De labels blijven Engels (kort en duidelijk voor de chauffeurs), de rest van
+de tool is Nederlands.
 
-**Fase 4 — Werklijst voor de reachers (gebouwd)**
-"Vrij te maken locaties" (Fase 3) is een aantal, geen instructie — daarom is
-er een kolom "Actie" bijgekomen die per pallet-regel aangeeft wat een
-reachtruck-chauffeur moet doen: **Legen** (voorraad overhevelen naar een
-andere pallet van hetzelfde artikel) voor de pallets met de laagste vulgraad
-van dat artikel — precies zoveel als er vrij te maken locaties zijn — en
-**Behouden** (ontvangt die overgehevelde voorraad) voor de rest. Binnen elk
-artikel staan de "Legen"-pallets bovenaan (sortering op vulgraad oplopend),
-zodat de werklijst zelf al de juiste volgorde toont.
-Dit kan alleen betrouwbaar bepaald worden als van ALLE pallets van een
-artikel de vulgraad bekend is — is dat niet zo, dan raadt de tool niet welke
-specifieke pallet het is en toont de kolom "onbekend" voor dat hele artikel.
-Zichtbaar als kolom in preview én export, en als totaal ("Pallets aangewezen
-om te legen") in de statistieken.
-Nog niet end-to-end getest in een echte browser met een echte
-voorraadexport (zelfde beperking als eerdere fases — geen Node/Python op
-deze machine).
+**Getest tot nu toe:** het capaciteitsmodel is buiten de browser om nagerekend
+op de échte referentiebestanden (via Excel COM, want er staat geen Node/Python
+op deze machine). Uitkomsten kloppen met de verwachting: het Eurom-voorbeeld
+komt op 100% (vol, geen kans) en de ondertegels op 65% met 38 stuks
+restruimte. Nog **niet** end-to-end in een browser met een echte
+voorraadexport getest — die wordt aangeleverd door de product owner.
 
-**Fase 5 — Later / optioneel**
-- Wachtwoord-encryptie voor de referentiebestanden in de repo (zie boven).
-- Preciezere volumeberekening (per laag/oriëntatie i.p.v. simpele
-  volumeratio) als de eenvoudige aanpak in de praktijk niet nauwkeurig
-  genoeg blijkt.
-- Duidelijke melding bij artikelen/locaties waarvan afmetingen ontbreken,
-  i.p.v. laten verdwijnen of fout laten rekenen.
+## Nog open / bewust geparkeerd
+**Geparkeerd — de tijdsdimensie (omloopsnelheid).** Idee: met een pick- of
+verkoopexport per artikel kan de tool onderscheid maken tussen "nu aanpakken"
+en "laat maar, is zo weg" — een pallet die volgende week toch leeggepickt
+wordt hoeft geen rit. Bewuste keuze van de product owner: goed idee, maar
+buiten scope voor nu. Bewaard als suggestie voor later. (Merk op dat de waarde
+hiervan in het piekvenster juist laag is: dan komt er voorraad binnen en wordt
+er weinig verkocht, dus is bijna alles een langzame loper.)
 
-**Nog open voordat Fase 1 gebouwd kan worden:** voorbeeld van het
-locatie-afmetingenbestand en het product-afmetingenbestand (kolomnamen,
-eenheden) nog aan te leveren door de product owner.
+**Geparkeerd — AI-verrijking.** Twee onderzochte toepassingen: producten
+classificeren op naam (i.p.v. het grove DOOS/BOX/TOP-woordfilter), en het
+doosvolume schatten uit gewicht + productgroep voor de 10.401
+placeholder-producten. Voor nu overgeslagen op verzoek van de product owner.
+Afgeschreven na test: afmetingen uit de productnaam halen werkt niet — slechts
+270 van de 29.996 namen bevatten maten, en die beschrijven meestal het
+opgebouwde product en niet de doos (een Intex-zwembad van 975×488×132 cm zit
+in een doos van 1150×800×1600 mm). Dit gat moet aan de bron dicht.
+
+**Geparkeerd — wachtwoord-encryptie** voor de referentiebestanden in de repo
+(zie de aanname over de public repo hierboven).
+
+**Openstaand — datakwaliteit aan de bron.** De grootste beperking is nu
+`products.xlsx`: 10.401 van 29.996 producten (35%) staan op placeholder
+1×1×1 mm. Elk van die artikelen levert "onbekend" op en verdwijnt dus uit de
+werklijst. Wil de dekking omhoog, dan moeten die afmetingen in het bron-WMS
+gevuld worden. De tool maakt zichtbaar hoeveel het zijn, maar kan het niet
+oplossen.
+
+**Openstaand — te overwegen na de eerste echte test.** In `locations.xlsx`
+staat de kolom `Stock on Location`, waaruit blijkt dat er nu al 2.174 locaties
+leegstaan (1.824 europallet-plekken, 23%). Die kan als context in de
+statistieken (hoeveel plekken zijn er al vrij, hoeveel komen er bij) of om
+consolidatie naar een betere lege locatie voor te stellen. Nog niet gebouwd.

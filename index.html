@@ -98,9 +98,14 @@
             <input type="checkbox" id="hideSinglePallet" checked class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 accent-[#eab627]" />
             Verberg artikelen die maar op 1 pallet staan (alleen consolidatie-kandidaten tonen)
           </label>
+          <label class="flex items-center gap-2.5 cursor-pointer text-sm font-medium mt-2.5">
+            <input type="checkbox" id="onlyOpportunities" checked class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 accent-[#eab627]" />
+            Alleen echte kansen tonen (er komt minstens 1 pallet-plek vrij)
+          </label>
           <div class="text-zinc-500 dark:text-zinc-400 text-xs mt-2">
             Alleen "Bulk Location" wordt meegeteld als pallet-locatie. "Bulk Location Extern" en
             pick-locaties tellen niet mee, want die pallets kun je niet fysiek samenvoegen met de rest.
+            Zet de tweede optie uit om ook volle pallets en artikelen met een onbekende capaciteit te zien.
           </div>
 
           <div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3 mt-4" id="statsBox"></div>
