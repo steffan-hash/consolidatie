@@ -51,6 +51,14 @@
           de vulgraad bekend is — anders is niet veilig te bepalen welke
           specifieke pallet de laagste is, en toont de kolom "onbekend".
 
+  Zoekfilter: een zoekveld boven de resultaattabel filtert op de zichtbare
+          kolommen (Location Code, Product Name, Quantity, Urn). Werkt als
+          laatste stap ná de score/actie-berekening, zodat zoeken naar 1
+          pallet van een artikel niet de "vrij te maken locaties"/Legen-Keep
+          bepaling voor dat artikel verstoort — die blijft naar alle pallets
+          van het artikel kijken, ook de pallets die het zoekresultaat niet
+          toont.
+
   Ruisreductie: drie automatische uitsluitingen om het resultaat te beperken
           tot echte consolidatiekansen i.p.v. duizenden regels. (1) Producten
           met "DOOS", "BOX" of "TOP" als los woord in de naam (verpakkings-
@@ -78,6 +86,7 @@
   const productGroupList = document.getElementById('productGroupList');
   const selectAllGroups = document.getElementById('selectAllGroups');
   const selectNoneGroups = document.getElementById('selectNoneGroups');
+  const searchInput = document.getElementById('searchInput');
   const statsBox = document.getElementById('statsBox');
   const statusEl = document.getElementById('status');
   const previewTable = document.getElementById('previewTable');
@@ -455,6 +464,7 @@
     selectedProductGroups = new Set();
     productGroupSection.style.display = 'none';
     productGroupList.innerHTML = '';
+    searchInput.value = '';
   }
 
   pickFileBtn.addEventListener('click', () => fileInput.click());
@@ -670,10 +680,24 @@
     });
     computeConsolidationActions(resultRows, productHeader);
 
+    // Zoekfilter als laatste stap: zoekt in exact de kolommen die ook in de
+    // tabel te zien zijn (Location Code, Product Name, Quantity, Urn). Pas
+    // NA de score/actie-berekening toegepast, want die moet naar alle
+    // pallets van een artikel kunnen kijken — anders zou zoeken op 1 pallet
+    // van een artikel de "vrij te maken locaties"/Legen-Keep-berekening voor
+    // dat artikel verstoren.
+    const searchTerm = normKey(searchInput.value);
+    if (searchTerm) {
+      resultRows = resultRows.filter(row =>
+        outputColumns.some(c => c.header && normKey(row[c.header]).includes(searchTerm))
+      );
+    }
+
     renderStats();
     renderPreview();
   }
   hideSinglePallet.addEventListener('change', applyFilter);
+  searchInput.addEventListener('input', applyFilter);
 
   function renderStats() {
     const productHeader = originalHeaders.find(h => normKey(h) === 'product');

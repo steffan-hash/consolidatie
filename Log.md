@@ -41,6 +41,11 @@ format.
 - Op verzoek een derde automatische uitsluiting toegevoegd: regels waarvan de `Location Code` (uit de voorraadexport) "CHITA" bevat worden volledig genegeerd, net als ruisreductie 1 (verpakkingsmateriaal). Nieuwe constante `NOISE_LOCATION_KEYWORD` en teller `chitaExcludedRowCount`, zichtbaar als eigen regel in de statistieken.
 - Ter controle in `data/reference/locations.xlsx` gekeken welke locaties dit raakt: 9 losse, apart benoemde plekken (`CHITA_AM1..4`, `CHITA_TOP1..4`, `CHITA_DOOS10`) — geen gewone rek-locaties met de standaard naamgeving, dus een aparte uitsluiting op naam is hier de juiste aanpak (i.p.v. bijv. op `StockLocationTypeName`, wat al bezet is door de bulk/pick-locatie-filtering).
 - `PROJECT.md` en de documentatie bovenaan `scripts/script.js` bijgewerkt (ruisreductie 1/2 → 1/2/3).
+
+**Vervolg dezelfde sessie — zoekveld boven de resultaattabel:**
+- Op verzoek een zoekveld toegevoegd boven de resultaattabel (`index.html`, nieuw `#searchInput`), dat filtert op de kolommen die ook zichtbaar zijn in de tabel (Location Code, Product Name, Quantity, Urn).
+- `scripts/script.js`: de zoekfilter wordt als láátste stap in `applyFilter()` toegepast — pas ná de vulgraad/score/actie-berekening. Bewuste keuze: zoeken naar bijv. 1 specifieke locatie van een artikel mag niet de "vrij te maken locaties"/Legen-Keep-bepaling voor dat artikel verstoren, want die moet naar alle pallets van het artikel kijken, ook de pallets die het zoekresultaat niet toont.
+- Werkt automatisch mee met export (downloadt alleen de gefilterde/gezochte regels) en met de statistieken (die tonen "huidig resultaat"), net als de bestaande filters (verberg-1-pallet, Product Group).
 - **Niet end-to-end getest in een echte browser** — zelfde beperking als de andere fases deze week (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar). Wel zorgvuldig nagelopen: de nieuwe logica hergebruikt dezelfde `__fillInfo`/`__score` die al op elke rij stonden, en de wijzigingen zijn beperkt tot een nieuwe, losstaande berekening plus een uitbreiding van sortering/weergave/export — geen bestaande logica aangepast.
 
 **Nog open:**
