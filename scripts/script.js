@@ -215,6 +215,20 @@
   const LOCATION_MIN_HEIGHT_MM = 300;   // lager dan dit is geen opslaglocatie
   const LOCATION_MAX_HEIGHT_MM = 4000;  // hoger dan dit is een invoerfout
 
+  // Overhang: voorraad mag over de rand van de pallet uitsteken. Zonder deze
+  // regel zou een strikte pasrekening onnodig veel artikelen als "past niet"
+  // wegzetten — gemeten op een echte export: 447 regels over 169 artikelen,
+  // waaronder een hangstoel van 940×940 mm op een europallet van 1200×800 (die
+  // staat er in de praktijk gewoon op) en een spacover van 2400×1210 mm op een
+  // 270-pallet van 2700×1200 (10 mm te breed op papier).
+  //
+  // Regel: past het product niet netjes binnen de voetprint, maar is het
+  // grondoppervlak niet groter dan deze factor × het palletoppervlak, dan gaan
+  // we uit van 1 stuk per laag. Dat is de laagst mogelijke aanname, dus het kan
+  // de capaciteit alleen onderschatten — nooit een valse consolidatiekans
+  // opleveren. Echt buitenmaatse artikelen blijven "past niet op pallet".
+  const OVERHANG_MAX_AREA_FACTOR = 2;
+
   // Vaste set kolommen voor het resultaat — niet instelbaar in de UI. De rest
   // van de brondata is ruis voor het consolideren van pallets.
   const OUTPUT_COLUMNS = [
@@ -243,6 +257,7 @@
   let noiseExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_PRODUCT_KEYWORDS (verpakkingsmateriaal)
   let chitaExcludedRowCount = 0;         // aantal regels genegeerd door NOISE_LOCATION_KEYWORD (CHITA-locaties)
   let observedOverrideCount = 0;         // aantal pallets waar meer op staat dan berekend past (zelfcorrectie)
+  let overhangAssumedCount = 0;          // aantal pallets waarbij overhang is aangenomen (1 stuk per laag)
   let refStats = null;                   // telling van afgekeurde referentiedata, voor de statistieken
 
   function norm(v) {
@@ -393,17 +408,30 @@
   // Het product staat rechtop (hoogte is vast), maar mag in het platte vlak
   // een kwartslag gedraaid worden — we nemen de beste van die twee liggingen.
   // Afronden naar beneden, want een half artikel bestaat niet.
+  //
+  // Past het niet netjes binnen de voetprint, dan wordt overhang toegestaan
+  // (zie OVERHANG_MAX_AREA_FACTOR): 1 stuk per laag, mits het artikel niet
+  // buitenmaats is. Geeft terug of die aanname gebruikt is, zodat het aantal
+  // zichtbaar te maken is in de statistieken.
   function unitsPerLayer(productLength, productWidth, footprint) {
     const opstelling1 = Math.floor(footprint.a / productLength) * Math.floor(footprint.b / productWidth);
     const opstelling2 = Math.floor(footprint.a / productWidth) * Math.floor(footprint.b / productLength);
-    return Math.max(opstelling1, opstelling2);
+    const netjes = Math.max(opstelling1, opstelling2);
+    if (netjes > 0) return { perLaag: netjes, overhang: false };
+
+    const productOppervlak = productLength * productWidth;
+    const palletOppervlak = footprint.a * footprint.b;
+    if (productOppervlak <= palletOppervlak * OVERHANG_MAX_AREA_FACTOR) {
+      return { perLaag: 1, overhang: true };
+    }
+    return { perLaag: 0, overhang: false };
   }
 
   // Capaciteit van 1 pallet-regel: hoeveel stuks van dit artikel passen er
   // fysiek op deze pallet op deze locatie? Dit vervangt de oude volumeratio.
   // Geeft altijd een reden mee als het niet lukt, zodat in de statistieken
   // zichtbaar is WAAROM iets onbekend is i.p.v. dat er iets geraden wordt.
-  function computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader) {
+  function computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader, urnTypeHeader) {
     if (!referenceDataReady) return { reason: 'referentiedata-niet-geladen' };
 
     const qty = Number(row[quantityHeader]);
@@ -419,18 +447,31 @@
     const location = locationInfoByCode.get(normKey(row[locationHeader]));
     if (!location) return { reason: 'locatie-onbruikbaar' };
 
+    // Palletsoort: de voorraadexport heeft zelf een "Urn Type"-kolom, en die
+    // zegt welke pallet er WERKELIJK staat — terwijl locations.xlsx zegt waar
+    // de locatie voor bedoeld is. Die twee verschillen in de praktijk (gemeten:
+    // 512 van 6310 regels, o.a. blokpallets op europallet-plekken), dus de
+    // export gaat voor. Ontbreekt de kolom of is de waarde onbekend, dan
+    // vallen we terug op de locatie.
+    let footprint = location.footprint;
+    if (urnTypeHeader !== undefined) {
+      const exportFootprint = PALLET_FOOTPRINTS[normKey(row[urnTypeHeader])];
+      if (exportFootprint) footprint = exportFootprint;
+    }
+
     // Stapelhoogte: de laagste van de locatiehoogte en de praktijkgrens van
     // ~2 m, min de hoogte die de pallet zelf inneemt.
     const stapelHoogte = Math.min(location.height, MAX_STAPELHOOGTE_MM) - PALLET_HOOGTE_MM;
     if (stapelHoogte <= 0) return { reason: 'locatie-te-laag' };
 
-    const perLaag = unitsPerLayer(product.length, product.width, location.footprint);
-    if (perLaag <= 0) return { reason: 'past-niet-op-pallet' };
+    const laag = unitsPerLayer(product.length, product.width, footprint);
+    if (laag.perLaag <= 0) return { reason: 'past-niet-op-pallet' };
+    if (laag.overhang) overhangAssumedCount++;
 
     const lagen = Math.floor(stapelHoogte / product.height);
     if (lagen <= 0) return { reason: 'product-te-hoog' };
 
-    const berekend = perLaag * lagen;
+    const berekend = laag.perLaag * lagen;
 
     // Zelfcorrectie: staat er méér op dan we berekenden, dan is de berekening
     // fout (of er wordt hoger/ruimer gestapeld dan aangenomen) — niet de
@@ -443,7 +484,8 @@
       capacity,
       berekend,
       qty,
-      perLaag,
+      perLaag: laag.perLaag,
+      overhang: laag.overhang,
       lagen,
       restruimte: capacity - qty,
       ratio: qty / capacity,
@@ -752,13 +794,15 @@
     const locationHeader = originalHeaders.find(h => normKey(h) === 'location code');
     const quantityHeader = originalHeaders.find(h => normKey(h) === 'quantity');
     const urnHeader = originalHeaders.find(h => normKey(h) === 'urn');
+    const urnTypeHeader = originalHeaders.find(h => normKey(h) === 'urn type'); // optioneel
 
     // Capaciteit vooraf voor ALLE basisregels berekenen (niet pas na filteren)
     // — de consolidatiescore moet naar alle pallets van een artikel kunnen
     // kijken, los van de huidige UI-filters.
     observedOverrideCount = 0;
+    overhangAssumedCount = 0;
     baseRows.forEach(row => {
-      row.__cap = computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader);
+      row.__cap = computeCapacity(row, productHeader, locationHeader, quantityHeader, urnHeader, urnTypeHeader);
     });
 
     scoreByProduct = computeConsolidationScores(productHeader, urnHeader);
@@ -779,31 +823,35 @@
       return true;
     });
 
+    // Score en actie per regel bepalen vóór het sorteren, want de actie is een
+    // sorteersleutel: in een werklijst horen de pallets die leeg moeten
+    // bovenaan te staan, niet verspreid tussen de blijvers.
+    resultRows.forEach(row => {
+      row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
+    });
+    computeConsolidationActions(resultRows, productHeader, urnHeader);
+
     // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan),
     // dan op product (zodat alle pallets van hetzelfde artikel bij elkaar
-    // staan), en als laatste op hoeveelheid oplopend — zo staan binnen een
-    // artikel de bijna-lege pallets (de te legen pallets) vanzelf boven de te
-    // behouden pallets, wat overeenkomt met hoe Empty/Keep bepaald wordt.
-    // Artikelen zonder bekende score (-1) staan onderaan.
+    // staan), dan op actie (Empty vóór Keep — dat is de daadwerkelijke
+    // werkvoorraad), en pas daarna op hoeveelheid en locatie voor een
+    // voorspelbare volgorde. Artikelen zonder bekende score (-1) staan onderaan.
+    const ACTION_ORDER = { legen: 0, behouden: 1, onbekend: 2 };
     resultRows = resultRows.slice().sort((a, b) => {
       const pa = norm(a[productHeader]), pb = norm(b[productHeader]);
       const freedA = scoreByProduct.has(pa) ? scoreByProduct.get(pa).locationsFreed : -1;
       const freedB = scoreByProduct.has(pb) ? scoreByProduct.get(pb).locationsFreed : -1;
       if (freedA !== freedB) return freedB - freedA;
       if (pa !== pb) return pa < pb ? -1 : 1;
+      const actA = ACTION_ORDER[a.__action] !== undefined ? ACTION_ORDER[a.__action] : 3;
+      const actB = ACTION_ORDER[b.__action] !== undefined ? ACTION_ORDER[b.__action] : 3;
+      if (actA !== actB) return actA - actB;
       const qa = a.__cap && a.__cap.reason === 'ok' ? a.__cap.qty : Infinity;
       const qb = b.__cap && b.__cap.reason === 'ok' ? b.__cap.qty : Infinity;
       if (qa !== qb) return qa - qb;
       const la = norm(a[locationHeader]), lb = norm(b[locationHeader]);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
-
-    // Consolidatiescore per regel vastleggen voor weergave/export, en daarna
-    // pas de actie per pallet bepalen — die heeft zowel __score als __cap nodig.
-    resultRows.forEach(row => {
-      row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
-    });
-    computeConsolidationActions(resultRows, productHeader, urnHeader);
 
     // Zoekfilter als laatste stap: zoekt in exact de kolommen die ook in de
     // tabel te zien zijn (Location Code, Product Name, Quantity, Urn). Pas
@@ -906,6 +954,12 @@
         stats.push({
           label: 'Capaciteit bijgesteld op wat er werkelijk op staat',
           num: `${observedOverrideCount} pallets`,
+        });
+      }
+      if (overhangAssumedCount) {
+        stats.push({
+          label: 'Overhang aangenomen (1 stuk per laag)',
+          num: `${overhangAssumedCount} pallets`,
         });
       }
 
