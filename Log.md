@@ -4,6 +4,30 @@ Dit bestand wordt door Claude bijgehouden, niet handmatig door de product
 owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
+## Sessie 2026-08-25
+**Status:** Product owner bevestigde: DOOS/BOX/TOP-woordfilter en het thema-knopje werken goed. Hoofdpunt van de sessie: uitgezocht waarom de vulgraad bij hetzelfde artikel (Eurom Flameheater, zelfde aantal per pallet) sterk varieerde — bevestigd dat dit een echt, fysiek locatieverschijnsel is, geen datafout. Bij het uitzoeken kwam een nieuwe, vergelijkbare datafout naar boven (suffix "-35" met placeholder-hoogte 100mm, zoals eerder bij "-45") — op verzoek meteen gefixt.
+
+**Wat gedaan — vulgraadspreiding uitgezocht (Eurom-voorbeeld):**
+- `data/reference/locations.xlsx` en `data/reference/products.xlsx` rechtstreeks uitgelezen via Excel COM-automatisering (geen Node/Python op deze machine) om de aanname te checken: "zelfde product + zelfde aantal = zelfde vulgraad, dus locatiegrootte is de enige variabele".
+- Product opgezocht: `STKY-00010342` "Eurom Flameheater round 11000 terrasverwarmer", 980×500×500mm.
+- Alle locaties in de 16-3-A-reeks per suffix (rek-niveau, bijv. "-50") gegroepeerd op werkelijke L×B×H. Uitkomst: **onder hetzelfde suffix komen per niveau 1 tot 5 verschillende échte afmetingen voor** (bijv. suffix "-50": hoogtes 1700/1800/2000mm bij normale breedte, plus twee dubbelbrede varianten met eigen hoogte). Berekende vulgraad voor het Eurom-artikel op deze varianten: 21%–51,2% — dekt en verklaart de door de product owner gerapporteerde 38%–51% volledig.
+- **Conclusie:** de aanname klopt. De spreiding is een structureel kenmerk van dit magazijn (bulklocaties met hetzelfde naamniveau zijn in de praktijk niet allemaal even groot), geen bug en geen datafout. Belangrijker: dit betekent dat de huidige "gelijkmatige stapeling"-ruisreductieregel (exacte match op aantal *én* vulgraad) hier terecht *niet* aanslaat — een pallet met dezelfde hoeveelheid in een grotere locatie heeft daadwerkelijk meer onbenutte ruimte, dus is geen "al optimaal gestapeld"-geval maar juist een verdoken consolidatiekans. Voorgelegd aan product owner of de regel zo moet blijven — nog geen expliciet antwoord gekregen op dat specifieke vervolgpunt (zie "Nog open").
+
+**Wat gedaan — nieuwe datafout gevonden en gefixt (suffix "-35", hoogte 100mm):**
+- Tijdens het bovenstaande onderzoek bleek suffix "-35" in de 16-3-A-reeks voor 53 van de 61 locaties een hoogte van precies 100mm te hebben — dezelfde placeholder-datafout als eerder bij suffix "-45" (zie sessie 2026-08-19/24), toen nog niet gecorrigeerd voor "-35".
+- Op verzoek van de product owner gefixt, volgens dezelfde, al bewezen werkwijze (LESSON 1: **niet** rechtstreeks XML/zip bewerken, wél via Excel COM-automatisering): voor elke "-35"-locatie met hoogte 100 is de hoogte overgenomen van de bijbehorende "-30"-locatie op dezelfde positie (bijv. `16-3-A-004-35` kreeg de hoogte van `16-3-A-004-30`).
+- Dit keer over het **volledige bestand** (niet alleen de 16-3-A-reeks): 54 locaties gefixt, 0 zonder "-30"-tegenhanger, 0 met een zelf verdacht lage "-30"-hoogte.
+- Backup gemaakt vóór het overschrijven: `data/reference/locations.xlsx.backup-20260825-112658` (niet meegecommit, puur lokaal — de vorige versie staat toch al in de git-historie). De oudere back-up van 24-08 staat er ook nog, nog niet gevraagd of die weg mag.
+- Geverifieerd: bestand opent foutloos in een verse Excel-instantie, rijaantal ongewijzigd (9040), 0 van de 148 "-35"-locaties in het hele bestand heeft nog een hoogte ≤200mm.
+- `scripts/script.js`: `REF_DATA_VERSION` opgehoogd naar `2026-08-25` (cache-buster), conform de vaste regel in `PROJECT.md` bij elke wijziging aan een referentiebestand.
+
+**Nog open:**
+- **Beslissing nog nodig:** blijft de "gelijkmatige stapeling"-regel op exacte match (aantal + vulgraad), of wordt er iets anders gewenst? De sessie liet zien dat de huidige regel hier feitelijk correct gedrag vertoont (Eurom-artikel terecht niet uitgesloten) — maar dat is nog niet expliciet bevestigd door de product owner als "zo laten staan".
+- Fase 3 in de live tool bevestigen met een echte voorraadexport (sortering op "Vrij te maken locaties", plausibiliteit van de waarden) — stond al open, nog niet gedaan.
+- Fase 4 van de roadmap (werklijst-UI met filter/sortering) staat nog volledig open.
+- Nog niet gevraagd of de losse lokale backups (`locations.xlsx.backup-20260824-154337` en `-20260825-112658`) verwijderd mogen worden.
+**Volgende stap:** Product owner laten testen met een echte voorraadexport of alles nog klopt (met name of de "-35"-fix het gewenste effect heeft), en een keuze maken over de "gelijkmatige stapeling"-regel.
+
 ## Sessie 2026-08-24
 **Status:** Lange sessie. "-45"-locatiehoogtefix en de bijbehorende browsercache-fix zijn bevestigd werkend. Fase 3 (consolidatiepotentieel/sortering) is gebouwd. De tool heeft een visuele update gekregen (Tailwind CSS, stijl richting ui.shadcn.com, 2-koloms layout, licht/donker thema). Twee ruisreductie-regels toegevoegd om de resultatenlijst gericht te maken; regel 2 ("gelijkmatige stapeling") bleek te strikt bij een echt voorbeeld en staat nog open (zie onderaan) — sessie hierop afgesloten met een uit te zoeken vraag i.p.v. een besliste aanpassing.
 
