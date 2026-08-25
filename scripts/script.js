@@ -765,9 +765,12 @@
   }
 
   // Actie per pallet (Fase 4) als leesbare tekst, zie computeConsolidationActions.
+  // Op verzoek van de product owner blijven deze twee statuslabels Engels
+  // ("Empty"/"Keep") i.p.v. Nederlands — kort en duidelijk genoeg voor de
+  // reachtruck-chauffeurs, de rest van de tool blijft Nederlands.
   function formatAction(action) {
-    if (action === 'legen') return 'Legen — overhevelen naar andere pallet';
-    if (action === 'behouden') return 'Behouden — ontvangt overige voorraad';
+    if (action === 'legen') return 'Empty';
+    if (action === 'behouden') return 'Keep';
     if (action === 'onbekend') return 'onbekend';
     return '-'; // geen consolidatiewinst voor dit artikel, geen actie nodig
   }

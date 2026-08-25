@@ -27,6 +27,7 @@ format.
 - Sortering aangepast: binnen elk artikel staan de pallets nu op vulgraad oplopend (was: op locatiecode) — zo staan de "Legen"-pallets vanzelf bovenaan in de werklijst, direct onder elkaar.
 - Nieuwe kolom "Actie" in preview (met een geel accent op "Legen"-regels, meteen herkenbaar) en in de export. Statistieken uitgebreid met een totaal ("Pallets aangewezen om te legen"), inclusief hoeveel artikelen dat niet zeker bepaald kon worden.
 - `PROJECT.md` bijgewerkt: Fase 4 van "open" naar "gebouwd" gezet.
+- Op verzoek de labels van de Actie-kolom van Nederlands ("Legen"/"Behouden") naar Engels ("Empty"/"Keep") gezet — de rest van de tool blijft Nederlands.
 - **Niet end-to-end getest in een echte browser** — zelfde beperking als de andere fases deze week (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar). Wel zorgvuldig nagelopen: de nieuwe logica hergebruikt dezelfde `__fillInfo`/`__score` die al op elke rij stonden, en de wijzigingen zijn beperkt tot een nieuwe, losstaande berekening plus een uitbreiding van sortering/weergave/export — geen bestaande logica aangepast.
 
 **Nog open:**
