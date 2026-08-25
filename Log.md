@@ -28,6 +28,14 @@ format.
 - Nieuwe kolom "Actie" in preview (met een geel accent op "Legen"-regels, meteen herkenbaar) en in de export. Statistieken uitgebreid met een totaal ("Pallets aangewezen om te legen"), inclusief hoeveel artikelen dat niet zeker bepaald kon worden.
 - `PROJECT.md` bijgewerkt: Fase 4 van "open" naar "gebouwd" gezet.
 - Op verzoek de labels van de Actie-kolom van Nederlands ("Legen"/"Behouden") naar Engels ("Empty"/"Keep") gezet — de rest van de tool blijft Nederlands.
+
+**Vervolg dezelfde sessie — breedte van "normale" europallet-locaties gecorrigeerd (900mm → 800mm):**
+- Product owner keek naar een concreet voorbeeld (`16-1-B-152-35`, "Ondertegels zwembad") en vroeg de rekenlogica uit te leggen. Berekening nagelopen en bevestigd te kloppen (500×500×30mm product × 72 stuks, tegen een 1200×1800×1870mm locatie, min 200mm pallethoogte en 15% omdoosmarge → 18%, exact zoals de tool toonde).
+- Bij het nalopen viel de product owner zelf op: de breedte van de "gewone" europallet-locaties (het overgrote deel, 7753 van de 9040) staat als 900mm in `locations.xlsx`, terwijl een europallet-plek 800mm breed moet zijn. Op verzoek gecorrigeerd: alle locaties met Width=900 zijn overschreven naar Width=800 (via Excel COM, zelfde werkwijze als de eerdere hoogte-fixes; LESSON 1).
+- De 583 locaties met Width=1800 (dubbelbrede plekken) zijn **niet** aangepast — de product owner gaf aan dat die zelf al niet klopten en dit zelf gaat corrigeren, dus bewust buiten deze fix gelaten.
+- **Opvallend, niet aangepast (buiten de vraag van vandaag):** 24 locaties met Width=200000 en 2 met Width=45000 — dat zijn 200 resp. 45 meter breed, fysiek onmogelijk voor een locatie. Vermoedelijk een losse datafout (bijv. een verkeerde eenheid of foutieve invoer), maar niet onderzocht of aangepast — de product owner heeft hier nog niet naar gevraagd.
+- Backup gemaakt vóór het overschrijven (lokaal, niet meegecommit — 3e lokale backup deze sessie). Geverifieerd: bestand opent foutloos, rijaantal ongewijzigd (9040), 7753 locaties nu op 800mm, overige breedtes ongewijzigd.
+- `scripts/script.js`: `REF_DATA_VERSION` opgehoogd naar `2026-08-25b`.
 - **Niet end-to-end getest in een echte browser** — zelfde beperking als de andere fases deze week (geen Node/Python op deze machine, geen lokale voorraadexport beschikbaar). Wel zorgvuldig nagelopen: de nieuwe logica hergebruikt dezelfde `__fillInfo`/`__score` die al op elke rij stonden, en de wijzigingen zijn beperkt tot een nieuwe, losstaande berekening plus een uitbreiding van sortering/weergave/export — geen bestaande logica aangepast.
 
 **Nog open:**
