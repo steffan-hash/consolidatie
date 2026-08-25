@@ -5,7 +5,11 @@ owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
 ## Sessie 2026-08-25
-**Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, Fase 4 met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Daarbij bleek de oorzaak van de ontevredenheid hard aan te wijzen: 35% van `products.xlsx` staat op placeholder-afmetingen, wat die artikelen juist bovenaan de werklijst zette. Fase 1–3 van het nieuwe model zijn gebouwd; de tijdsdimensie en AI-verrijking zijn op verzoek geparkeerd.
+**Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.
+
+Aan het eind van de sessie leverde de product owner een echte voorraadexport aan, en is de volledige pipeline daarop getest (buiten de browser om). Resultaat: **capaciteit bekend voor 96% van de regels en 1011 vrij te maken pallet-plekken** over 473 artikelen. Die test leverde direct drie verbeteringen op (palletsoort uit de export, Empty vóór Keep in de sortering, overhang toestaan) en één grote vondst: de hangstoel "Perth" staat op 49 pallets met 1 stuk erop terwijl er 5 à 6 op passen — 40 plekken uit één artikel.
+
+Fase 1–3 van het nieuwe model zijn gebouwd; de tijdsdimensie en AI-verrijking zijn op verzoek geparkeerd. **De tool is nog niet in een echte browser bekeken** — alleen de rekenkant is getoetst.
 
 **Wat gedaan — vulgraadspreiding uitgezocht (Eurom-voorbeeld):**
 - `data/reference/locations.xlsx` en `data/reference/products.xlsx` rechtstreeks uitgelezen via Excel COM-automatisering (geen Node/Python op deze machine) om de aanname te checken: "zelfde product + zelfde aantal = zelfde vulgraad, dus locatiegrootte is de enige variabele".
