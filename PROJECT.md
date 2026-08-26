@@ -235,6 +235,26 @@ dan overblijft kan leeg. Binnen elk artikel staan de Empty-pallets bovenaan.
 De labels blijven Engels (kort en duidelijk voor de chauffeurs), de rest van
 de tool is Nederlands.
 
+**Fase 4b — Van→naar-koppeling (gebouwd, 3.0, proof of concept eerst getoetst)**
+Kolom **Naar** wijst voor een "Empty"-pallet een concrete bestemming aan: de
+volledige inhoud gaat in één keer naar één specifieke "Keep"-pallet (best
+fit — de ontvanger met de kleinste restruimte die nog wel groot genoeg is).
+
+Vóór het bouwen is dit eerst als proof of concept getoetst op de echte
+export, buiten de tool om. Uitkomst: een volledige consolidatie (elke donor
+kost hoeveel ontvangers dan ook nodig zijn) leidde bij grote artikelen tot
+tientallen losse regels van een paar stuks — bijv. 91 pallets ondertegels
+gaf 62 verplaatsingsregels voor maar 14 te legen pallets. Niet uitvoerbaar
+voor een chauffeur.
+
+**Beslissing van de product owner:** alleen de schone gevallen tonen. Past
+een donorpallet nergens in zijn geheel bij één ontvanger, dan blijft hij
+gewoon "Empty" zonder concrete "Naar" ("-") — geen versnipperde instructie.
+Op de echte export: 67% van de te legen pallets (488 van 728) krijgt zo een
+concrete, in 1 beweging uit te voeren bestemming; elke instructie is precies
+1 verplaatsing. Zichtbaar als kolom in preview én export, met een totaal in
+de statistieken ("Waarvan met concrete 'Naar'-locatie").
+
 **Getest op een echte voorraadexport (25-08-2026).** De volledige pipeline is
 buiten de browser om nagebouwd en op `data/input/voorraad_export.xlsx` (7054
 regels) gedraaid, want er staat geen Node/Python op deze machine. Uitkomsten:

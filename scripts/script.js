@@ -80,6 +80,17 @@
           Kolom "Restruimte" laat zien hoeveel stuks er nog bij kunnen — dat is
           het getal waar een chauffeur iets mee kan.
 
+  Van→naar (3.0): kolom "Naar" wijst voor een "Empty"-pallet een concrete
+          bestemming aan — maar alleen als de hele inhoud in één keer bij één
+          "Keep"-pallet past (best fit: de ontvanger met de kleinste
+          restruimte die nog wel groot genoeg is). Past een donorpallet
+          nergens in zijn geheel, dan blijft hij "Empty" zonder doel ("-"),
+          in plaats van een versnipperde instructie te tonen (voorraad over
+          meerdere ontvangers verdelen). Bewuste keuze van de product owner
+          na een proof of concept: bij grote artikelen leidde volledige
+          consolidatie tot tientallen losse regels van een paar stuks — niet
+          uitvoerbaar voor een chauffeur. Zie computeVanNaarMoves().
+
   Zoekfilter: een zoekveld boven de resultaattabel filtert op de zichtbare
           kolommen (Location Code, Product Name, Quantity, Urn). Werkt als
           laatste stap ná de score/actie-berekening, zodat zoeken naar 1
@@ -611,6 +622,48 @@
     });
   }
 
+  // Van→naar: voor elke "Empty"-pallet (legen) kijken of zijn hele inhoud in
+  // één keer bij één "Keep"-pallet (behouden) past — dan is dat een schone,
+  // in één beweging uit te voeren instructie. Past een donorpallet nergens in
+  // zijn geheel, dan blijft hij gewoon "Empty" zonder concreet doel: op
+  // verzoek van de product owner tonen we bewust geen versnipperde
+  // instructies (een pallet over meerdere ontvangers verdelen). Proof of
+  // concept op de echte export liet zien dat dat voor grote artikelen tot
+  // tientallen losse regels van een paar stuks leidt — niet uitvoerbaar.
+  //
+  // Donoren van groot naar klein verwerkt, en per donor de ontvanger met de
+  // KLEINSTE restruimte die nog wel groot genoeg is (best fit) — dat
+  // voorkomt dat een kleine donor een grote, later hard nodige ontvanger
+  // opsoupeert. Vereist dat __action al gezet is (zie computeConsolidationActions).
+  function computeVanNaarMoves(rows, productHeader, urnHeader, locationHeader) {
+    const rowsByProduct = new Map();
+    rows.forEach(row => {
+      row.__moveTo = null; // opnieuw bepalen bij elke herberekening, geen oude waarde laten hangen
+      const product = norm(row[productHeader]);
+      if (!rowsByProduct.has(product)) rowsByProduct.set(product, []);
+      rowsByProduct.get(product).push(row);
+    });
+
+    rowsByProduct.forEach((productRows, product) => {
+      const receivers = Array.from(groupByUrn(productRows.filter(r => r.__action === 'behouden'), urnHeader).values())
+        .map(p => ({ ...p, vrij: p.capacity - p.qty }));
+      const donors = Array.from(groupByUrn(productRows.filter(r => r.__action === 'legen'), urnHeader).values())
+        .sort((a, b) => b.qty - a.qty);
+      if (!donors.length || !receivers.length) return;
+
+      donors.forEach(donor => {
+        const bestFit = receivers
+          .filter(r => r.vrij >= donor.qty)
+          .sort((a, b) => a.vrij - b.vrij)[0];
+        if (!bestFit) return; // geen enkele ontvanger heeft in 1 keer plek — blijft "Empty" zonder doel
+
+        bestFit.vrij -= donor.qty;
+        const targetLocation = norm(bestFit.rows[0][locationHeader]);
+        donor.rows.forEach(row => { row.__moveTo = { location: targetLocation, urn: bestFit.urn }; });
+      });
+    });
+  }
+
   function resetUI() {
     clearError();
     filterCard.style.display = 'none';
@@ -838,6 +891,7 @@
       row.__score = scoreByProduct.get(norm(row[productHeader])) || null;
     });
     computeConsolidationActions(resultRows, productHeader, urnHeader);
+    computeVanNaarMoves(resultRows, productHeader, urnHeader, locationHeader);
 
     // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan),
     // dan op product (zodat alle pallets van hetzelfde artikel bij elkaar
@@ -919,6 +973,17 @@
         { label: 'Vrij te maken pallet-plekken', num: totalLocationsFreed },
         { label: 'Pallets leeghalen om dat te bereiken', num: toEmptyCount }
       );
+
+      // Van→naar: bij hoeveel van de te legen pallets is er een concrete,
+      // schone bestemming gevonden (zie computeVanNaarMoves)? De rest is nog
+      // steeds "Empty", maar zonder specifiek doel — bewust, geen datafout.
+      if (toEmptyCount) {
+        const withTarget = resultRows.filter(r => r.__action === 'legen' && r.__moveTo).length;
+        stats.push({
+          label: 'Waarvan met concrete "Naar"-locatie',
+          num: `${withTarget} / ${toEmptyCount}`,
+        });
+      }
 
       stats.push({
         label: 'Artikelen met een aantoonbare kans',
@@ -1018,6 +1083,14 @@
     return String(score.locationsFreed);
   }
 
+  // Doellocatie (van→naar) als leesbare tekst: alleen gevuld bij een schone
+  // match (zie computeVanNaarMoves) — anders "-", niet "onbekend", want dit is
+  // geen ontbrekende data maar een bewuste keuze om geen versnipperde
+  // instructie te tonen.
+  function formatMoveTo(moveTo) {
+    return moveTo ? moveTo.location : '-';
+  }
+
   // Actie per pallet (Fase 4) als leesbare tekst, zie computeConsolidationActions.
   // Op verzoek van de product owner blijven deze twee statuslabels Engels
   // ("Empty"/"Keep") i.p.v. Nederlands — kort en duidelijk genoeg voor de
@@ -1041,7 +1114,7 @@
     const trClass = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60';
 
     const showFillColumn = referenceDataReady;
-    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Restruimte', 'Vrij te maken locaties', 'Actie'] : []);
+    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Restruimte', 'Vrij te maken locaties', 'Actie', 'Naar'] : []);
     const thead = '<thead><tr>' + headers.map(h => `<th class="${thClass}">${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
@@ -1058,6 +1131,7 @@
           ? `${tdClass} font-medium text-[#8a6d1a] dark:text-[#eab627]`
           : tdClass;
         cells.push(`<td class="${actionClass}">${formatAction(row.__action)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatMoveTo(row.__moveTo)}</td>`);
       }
       return `<tr class="${trClass}">` + cells.join('') + '</tr>';
     }).join('');
@@ -1082,6 +1156,7 @@
           { label: 'Restruimte', header: null, isRestColumn: true },
           { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
           { label: 'Actie', header: null, isActionColumn: true },
+          { label: 'Naar', header: null, isMoveToColumn: true },
         ] : []
       );
       const valueFor = (row, c) => c.isFillColumn
@@ -1092,6 +1167,8 @@
         ? formatLocationsFreed(row.__score)
         : c.isActionColumn
         ? formatAction(row.__action)
+        : c.isMoveToColumn
+        ? formatMoveTo(row.__moveTo)
         : (c.header ? row[c.header] : '');
 
       // Kolombreedte: Location Code/Quantity/Urn/Vulgraad/Vrij te maken
@@ -1107,6 +1184,7 @@
         'Restruimte': { min: 11, max: 14 },
         'Vrij te maken locaties': { min: 12, max: 22 },
         'Actie': { min: 8, max: 12 },
+        'Naar': { min: 12, max: 22 },
       };
       sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };

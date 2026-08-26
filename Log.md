@@ -16,8 +16,18 @@ format.
 **Wat gedaan — opruimen:**
 - De 3 lokale backups van `locations.xlsx` (24-08 en 25-08, nooit in git) verwijderd op uitdrukkelijk verzoek van de product owner. De originele versies staan toch al in de git-historie.
 
+**Wat gedaan — proof of concept van→naar-koppeling, daarna gebouwd:**
+- Product owner vroeg om een proof of concept voor de van→naar-koppeling (het openstaande punt van gisteren: de werklijst zei Empty/Keep maar niet waar de voorraad naartoe moest).
+- Algoritme buiten de tool om gebouwd en getest op `data/input/voorraad_export.xlsx`: per artikel de volste pallets als ontvanger, de rest als donor (zelfde logica als Actie/Empty-Keep), en dan best-fit-decreasing (elke donor bij voorkeur heel in 1 ontvanger, de ontvanger met de kleinste restruimte die nog wel past).
+- **Eerste versie (volledige consolidatie) bleek onbruikbaar:** bij het grootste artikel (91 pallets ondertegels) werden 14 te legen pallets verdeeld over 62 losse verplaatsingsregels, vaak van 2-3 stuks. Verdeling over de hele export: 66% van de donorpallets (483 van 728) past in 1 beweging bij 1 ontvanger, maar 34% moest over 2 tot 11 ontvangers gesplitst worden. Geen bug — een gevolg van het doel zelf (zo min mogelijk pallets gebruiken vult per definitie de restruimte van veel bijna-volle pallets in kleine beetjes).
+- Voorgelegd aan de product owner met 3 opties (maximale consolidatie met versnippering, simpelere instructies met een cap op ontvangers per donor, of alleen de schone gevallen tonen). Gekozen: **alleen de schone gevallen tonen.** Versnipperde donors blijven gewoon "Empty" zonder concreet doel, zoals nu.
+- **Gebouwd in `scripts/script.js`:** nieuwe functie `computeVanNaarMoves()`, draait na `computeConsolidationActions()`. Nieuwe kolom **Naar** in preview en export (leeg "-" als er geen schone match is, geen "onbekend" — dit is een bewuste keuze, geen ontbrekende data). Nieuwe statistiek "Waarvan met concrete 'Naar'-locatie".
+- Op de echte export: **67% van de 728 te legen pallets (488) krijgt nu een concrete, in 1 beweging uit te voeren bestemming.**
+- `PROJECT.md` bijgewerkt: Fase 4b toegevoegd met de proof-of-concept-uitkomst en de beslissing.
+
 **Nog open:**
-- Proof of concept voor de van→naar-koppeling — zie hieronder, wordt deze sessie opgepakt.
+- Fase 4b nog niet in een echte browser bekeken — alleen de logica is getest via een losstaande PowerShell-nabouw.
+- De 33% zonder concrete "Naar" is nog steeds "Empty" zonder instructie. Niet gevraagd of dat later alsnog moet (bijv. met een cap van 2-3 ontvangers) — voor nu bewust zo gelaten.
 
 ## Sessie 2026-08-25
 **Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.
