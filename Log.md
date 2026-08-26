@@ -5,7 +5,7 @@ owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
 ## Sessie 2026-08-26
-**Status:** Korte sessie, vervolg op de model 3.0-test van gisteren. Drie punten van de product owner afgehandeld: de hangstoel-aanname is afgekeurd en gecorrigeerd, de lokale backups zijn opgeruimd, en er wordt begonnen aan een proof of concept voor de van→naar-koppeling.
+**Status:** Vervolg op de model 3.0-test van gisteren. Vier punten van de product owner afgehandeld: de hangstoel-aanname is afgekeurd en gecorrigeerd, de lokale backups zijn opgeruimd, de van→naar-koppeling is als proof of concept getoetst en daarna gebouwd, en de tool is voor het eerst deze sessie écht in een browser getest (met de echte export). Alles bevestigd werkend.
 
 **Wat gedaan — overhang-aanname bijgesteld (hangstoel bleek een valse kans):**
 - Product owner bevestigde: nee, 5-6 lagen overhangende hangstoelen op elkaar stapelen is niet realistisch. Dat was precies de aanname achter de grootste kans uit de vorige sessie (40 vrij te maken locaties bij "Hangstoel Perth").
@@ -25,9 +25,17 @@ format.
 - Op de echte export: **67% van de 728 te legen pallets (488) krijgt nu een concrete, in 1 beweging uit te voeren bestemming.**
 - `PROJECT.md` bijgewerkt: Fase 4b toegevoegd met de proof-of-concept-uitkomst en de beslissing.
 
+**Wat gedaan — eerste echte browsertest van de hele sessie:**
+- Product owner bevestigde ("Ja") dat dit de volgende stap moest zijn. Er is geen Node/Python op deze machine en geen bestaande project-skill om de tool te draaien, dus zelf een minimale testopstelling gebouwd: een statische bestandsserver via PowerShell (`System.Net.HttpListener`, nodig omdat de referentiebestanden alleen laden via `fetch()` als de pagina via http bediend wordt) en een headless Chrome-instantie aangestuurd via het Chrome DevTools Protocol (ruwe WebSocket-berichten via `System.Net.WebSockets.ClientWebSocket` in PowerShell — geen Node/Playwright nodig).
+- Twee kinderziektes in de testopstelling zelf gefixt (niet in de tool): (1) een race condition waarbij de tab al begon te laden vóórdat de Page-events werden aangezet, waardoor `Page.loadEventFired` gemist werd — opgelost door eerst een lege tab te openen, dan pas de events aan te zetten, en dan pas te navigeren; (2) een geannuleerde `ReceiveAsync`-aanroep (voor een idle-timeout) zet een `ClientWebSocket` definitief op "Aborted" — opgelost door nooit te annuleren en in plaats daarvan met korte, gegarandeerd snel beantwoorde commando's te pollen.
+- **Resultaat: de tool laadt foutloos** (geen JS-exceptions, geen console-fouten) en de referentiedata-melding in de console kwam exact overeen met de eerdere offline-berekening (18.220/29.996 producten, 9.006/9.039 locaties bruikbaar).
+- **De echte export geüpload** via `DOM.setFileInputFiles` + een handmatig gedispatched `change`-event (precies zoals een gebruiker een bestand zou kiezen). Uitkomst in de UI, afgelezen via `Runtime.evaluate`: **926 vrij te maken pallet-plekken, 848 pallets leeghalen, 677/848 met een concrete "Naar"-locatie** — komt overeen met de eerdere berekeningen (kleine verschillen met de losse PowerShell-POC zijn te verklaren doordat de POC niet exact dezelfde UI-filters toepaste).
+- **Visueel gecontroleerd met screenshots** (viewport vergroot naar 1600px breed voor de 2-koloms desktop-layout): resultaattabel, statistieken, de nieuwe checkbox "Alleen echte kansen tonen", de kolommen Actie (met het gele accent op "Empty") en Naar (met "-" bij pallets zonder schone match), en het lichte thema — allemaal correct en leesbaar.
+- Chrome en de lokale server na afloop weer afgesloten.
+
 **Nog open:**
-- Fase 4b nog niet in een echte browser bekeken — alleen de logica is getest via een losstaande PowerShell-nabouw.
 - De 33% zonder concrete "Naar" is nog steeds "Empty" zonder instructie. Niet gevraagd of dat later alsnog moet (bijv. met een cap van 2-3 ontvangers) — voor nu bewust zo gelaten.
+- Overwegen: deze testopstelling (statische server + CDP-aansturing via PowerShell) vastleggen als project-skill (`/run-skill-generator`), zodat een volgende sessie de tool niet opnieuw vanaf nul hoeft op te zetten om te testen.
 
 ## Sessie 2026-08-25
 **Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.

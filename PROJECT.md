@@ -280,7 +280,14 @@ De product owner bevestigde dat meerdere lagen van een overstekend artikel
 stapelen niet realistisch is — daarom is de aanname bijgesteld naar precies 1
 laag bij overhang (zie hierboven), waarna deze kans terecht verdween.
 
-Nog niet in een echte browser bekeken (alleen de rekenkant is getoetst).
+**Bevestigd in een echte browser (26-08-2026).** De tool is end-to-end getest
+in headless Chrome (lokale server + Chrome DevTools Protocol, want er staat
+geen Node/Python op deze machine): pagina laadt foutloos, referentiedata
+laadt met exact dezelfde aantallen als de offline-berekening, en na het
+uploaden van de echte export toonde de UI **926 vrij te maken pallet-plekken,
+848 pallets leeghalen, 677/848 met een concrete "Naar"-locatie** — in lijn
+met de eerdere doorrekening. Layout, statistieken, Actie/Naar-kolommen en het
+lichte thema zijn met screenshots visueel gecontroleerd en correct bevonden.
 
 ## Nog open / bewust geparkeerd
 **Geparkeerd — de tijdsdimensie (omloopsnelheid).** Idee: met een pick- of
