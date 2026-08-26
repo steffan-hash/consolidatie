@@ -68,14 +68,21 @@ start index.html
 - **Consolidatie-kandidaat** = een artikel dat op 2 of meer unieke pallets
   (verschillende `Urn`-waarden) op een Bulk Location staat. Artikelen op
   precies 1 pallet worden standaard verborgen (instelbaar via checkbox).
+- **Kolomvolgorde in preview én export** (vast, op verzoek van de product
+  owner): Location Code, Product Name, Quantity, Fill Rate, Action, To,
+  Locations Freed, Remaining, Urn — Urn staat altijd als allerlaatste kolom.
+  De berekende kolommen hebben Engelse namen (kort en duidelijk voor de
+  reachtruck-chauffeurs); de rest van de tool (UI-teksten, statistieken)
+  blijft Nederlands.
 - Het exportbestand bevat standaard 6 kolommen: Location Code, Product Name
-  (= `Description` uit de bron), Quantity, Restruimte, Actie en Naar. **Urn,
-  Vulgraad en Vrij te maken locaties staan er bewust niet in** — met alle 9
+  (= `Description` uit de bron), Quantity, Action, To en Remaining. **Urn,
+  Fill Rate en Locations Freed staan er bewust niet in** — met alle 9
   kolommen paste de export niet meer op 1 A4 liggend. Deze 3 blijven altijd
-  gewoon zichtbaar in de preview-tabel; een toggle ("Urn, Vulgraad en Vrij te
-  maken locaties ook meenemen in de export", standaard uit) zet ze er in de
-  export weer bij. Getest: zonder toggle 6 kolommen/105 KB, met toggle 9
-  kolommen/150 KB, printopmaak blijft in beide gevallen 1 pagina breed.
+  gewoon zichtbaar in de preview-tabel; een toggle ("Urn, Fill Rate en
+  Locations Freed ook meenemen in de export", standaard uit) zet ze er in de
+  export weer bij, in dezelfde volgorde (Urn als laatste). Getest: zonder
+  toggle 6 kolommen/104 KB, met toggle 9 kolommen/150 KB, printopmaak blijft
+  in beide gevallen 1 pagina breed.
 - Resultaat wordt gesorteerd op vrij te maken locaties (meeste winst
   bovenaan), dan op product zodat alle pallets van hetzelfde artikel bij
   elkaar staan, en binnen een artikel op hoeveelheid oplopend — zodat de

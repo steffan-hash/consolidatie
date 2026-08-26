@@ -17,10 +17,10 @@
          regels heen gezocht naar de koprij.
 
   Output: Een nieuw .xlsx bestand dat gedownload wordt
-          (rapportage_consolidatie_pallets_YYYY-MM-DD.xlsx). Het resultaat
-          bevat de 4 vaste kolommen (Location Code, Product Name, Quantity,
-          Urn) plus een berekende kolom Vulgraad — de rest van de brondata
-          is niet nodig om pallets te vinden en fysiek te consolideren.
+          (rapportage_consolidatie_pallets_YYYY-MM-DD.xlsx). Kolomvolgorde:
+          Location Code, Product Name, Quantity, Fill Rate, Action, To,
+          Locations Freed, Remaining, Urn (zie "Exportkolommen" hieronder
+          voor welke daarvan standaard wél/niet in het exportbestand zitten).
           Printopmaak staat op A4 liggend, geschaald naar 1 pagina breed,
           met Product Name zo breed als de andere kolommen toelaten.
 
@@ -75,12 +75,12 @@
   Werklijst voor de reachers (3.0): per artikel wordt bepaald hoeveel pallets
           er minimaal nodig zijn (vul de volste pallets, tel hun capaciteit op
           tot de totale hoeveelheid erin past). Het verschil met het huidige
-          aantal pallets is "Vrij te maken locaties". De pallets die overblijven
-          krijgen actie "Empty" (leeghalen, minst erop = eerst), de rest "Keep".
-          Kolom "Restruimte" laat zien hoeveel stuks er nog bij kunnen — dat is
-          het getal waar een chauffeur iets mee kan.
+          aantal pallets is kolom "Locations Freed". De pallets die
+          overblijven krijgen actie "Empty" (leeghalen, minst erop = eerst),
+          de rest "Keep". Kolom "Remaining" laat zien hoeveel stuks er nog
+          bij kunnen — dat is het getal waar een chauffeur iets mee kan.
 
-  Van→naar (3.0): kolom "Naar" wijst voor een "Empty"-pallet een concrete
+  Van→naar (3.0): kolom "To" wijst voor een "Empty"-pallet een concrete
           bestemming aan — maar alleen als de hele inhoud in één keer bij één
           "Keep"-pallet past (best fit: de ontvanger met de kleinste
           restruimte die nog wel groot genoeg is). Past een donorpallet
@@ -91,11 +91,19 @@
           consolidatie tot tientallen losse regels van een paar stuks — niet
           uitvoerbaar voor een chauffeur. Zie computeVanNaarMoves().
 
+  Kolomvolgorde en -namen (3.0): op verzoek van de product owner staan de
+          berekende kolommen in het Engels (Fill Rate, Action, To, Locations
+          Freed, Remaining) — kort en duidelijk voor de reachtruck-
+          chauffeurs, de rest van de tool (UI-teksten, statistieken) blijft
+          Nederlands. Volgorde: Location Code, Product Name, Quantity, Fill
+          Rate, Action, To, Locations Freed, Remaining, Urn — Urn staat
+          bewust als allerlaatste kolom.
+
   Exportkolommen (3.0): de export paste niet meer op 1 A4 liggend met alle
-          kolommen erbij. Urn, Vulgraad en Vrij te maken locaties staan
-          daarom standaard NIET in het geëxporteerde bestand — wel altijd in
-          de preview-tabel. Een toggle ("exportExtraColumns") zet ze er op
-          verzoek weer bij.
+          kolommen erbij. Urn, Fill Rate en Locations Freed staan daarom
+          standaard NIET in het geëxporteerde bestand — wel altijd in de
+          preview-tabel. Een toggle ("exportExtraColumns") zet ze er op
+          verzoek weer bij (dan ook in dezelfde volgorde, Urn als laatste).
 
   Zoekfilter: een zoekveld boven de resultaattabel filtert op de zichtbare
           kolommen (Location Code, Product Name, Quantity, Urn). Werkt als
@@ -248,16 +256,19 @@
   const OVERHANG_MAX_AREA_FACTOR = 2;
 
   // Vaste set kolommen voor het resultaat — niet instelbaar in de UI. De rest
-  // van de brondata is ruis voor het consolideren van pallets.
+  // van de brondata is ruis voor het consolideren van pallets. Urn staat
+  // hier los van (zie URN_COLUMN): die staat op verzoek van de product owner
+  // altijd als laatste kolom, ná de berekende kolommen.
   const OUTPUT_COLUMNS = [
     { key: 'location code', label: 'Location Code' },
     { key: 'description', label: 'Product Name' },
     { key: 'quantity', label: 'Quantity' },
-    { key: 'urn', label: 'Urn' },
   ];
+  const URN_COLUMN = { key: 'urn', label: 'Urn' };
 
   let originalHeaders = [];   // koprij in originele volgorde, zoals in het bestand
   let outputColumns = [];     // OUTPUT_COLUMNS aangevuld met de bijbehorende originele headernaam
+  let urnColumn = null;       // URN_COLUMN aangevuld met de bijbehorende originele headernaam
   let baseRows = [];          // rijen op een "Bulk Location", als objecten {header: waarde}
   let palletCountByProduct = new Map(); // Product -> aantal unieke pallets (Urn's)
   let resultRows = [];        // rijen die momenteel getoond/geëxporteerd worden
@@ -680,6 +691,7 @@
     baseRows = [];
     resultRows = [];
     outputColumns = [];
+    urnColumn = null;
     palletCountByProduct = new Map();
     totalQtyByProduct = new Map();
     scoreByProduct = new Map();
@@ -740,6 +752,10 @@
       label: c.label,
       header: originalHeaders.find(h => normKey(h) === c.key), // undefined als kolom ontbreekt in dit bestand
     }));
+    urnColumn = {
+      label: URN_COLUMN.label,
+      header: originalHeaders.find(h => normKey(h) === URN_COLUMN.key),
+    };
     const headerRowNormalized = best.headerRow.map(normKey);
     const colIndex = {};
     headerRowNormalized.forEach((h, i) => { if (h !== '') colIndex[h] = i; });
@@ -930,8 +946,9 @@
     // dat artikel verstoren.
     const searchTerm = normKey(searchInput.value);
     if (searchTerm) {
+      const searchableColumns = urnColumn ? outputColumns.concat([urnColumn]) : outputColumns;
       resultRows = resultRows.filter(row =>
-        outputColumns.some(c => c.header && normKey(row[c.header]).includes(searchTerm))
+        searchableColumns.some(c => c.header && normKey(row[c.header]).includes(searchTerm))
       );
     }
 
@@ -1120,8 +1137,13 @@
     const tdClass = 'px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 whitespace-nowrap';
     const trClass = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60';
 
+    // Kolomvolgorde op verzoek van de product owner: Location Code, Product
+    // Name, Quantity, dan de berekende kolommen (Engelse termen), en Urn als
+    // allerlaatste kolom.
     const showFillColumn = referenceDataReady;
-    const headers = outputColumns.map(c => c.label).concat(showFillColumn ? ['Vulgraad', 'Restruimte', 'Vrij te maken locaties', 'Actie', 'Naar'] : []);
+    const headers = outputColumns.map(c => c.label)
+      .concat(showFillColumn ? ['Fill Rate', 'Action', 'To', 'Locations Freed', 'Remaining'] : [])
+      .concat(urnColumn ? [urnColumn.label] : []);
     const thead = '<thead><tr>' + headers.map(h => `<th class="${thClass}">${h}</th>`).join('') + '</tr></thead>';
     const bodyRows = resultRows.slice(0, maxPreview).map(row => {
       const cells = outputColumns.map(c => {
@@ -1130,8 +1152,6 @@
       });
       if (showFillColumn) {
         cells.push(`<td class="${tdClass}">${formatFillRatio(row.__cap)}</td>`);
-        cells.push(`<td class="${tdClass}">${formatRestruimte(row.__cap)}</td>`);
-        cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
         // "Legen"-pallets extra opvallend (geel accent), zodat ze in de
         // preview meteen te herkennen zijn zonder de tekst te moeten lezen.
         const actionClass = row.__action === 'legen'
@@ -1139,6 +1159,12 @@
           : tdClass;
         cells.push(`<td class="${actionClass}">${formatAction(row.__action)}</td>`);
         cells.push(`<td class="${tdClass}">${formatMoveTo(row.__moveTo)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatLocationsFreed(row.__score)}</td>`);
+        cells.push(`<td class="${tdClass}">${formatRestruimte(row.__cap)}</td>`);
+      }
+      if (urnColumn) {
+        const val = urnColumn.header ? row[urnColumn.header] : '';
+        cells.push(`<td class="${tdClass}">${val === undefined || val === null ? '' : String(val)}</td>`);
       }
       return `<tr class="${trClass}">` + cells.join('') + '</tr>';
     }).join('');
@@ -1154,29 +1180,28 @@
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Consolidatie');
 
-      // De 4 vaste brondkolommen, plus Vulgraad, Vrij te maken locaties
-      // (Fase 3) en Actie (Fase 4) als berekende kolommen — maar alleen als
-      // de referentiedata geladen kon worden.
+      // Zelfde kolomvolgorde als de preview (zie renderPreview): Location
+      // Code, Product Name, Quantity, dan de berekende kolommen (Engelse
+      // termen), en Urn als allerlaatste kolom.
       //
-      // Urn, Vulgraad en Vrij te maken locaties staan altijd in de preview,
-      // maar duwden de export over de rand van 1 A4 liggend. Op verzoek van
-      // de product owner staan ze standaard NIET in de export — via de
-      // toggle "exportExtraColumns" zijn ze er alsnog bij te zetten.
+      // Urn, Fill Rate en Locations Freed duwden de export over de rand van
+      // 1 A4 liggend. Op verzoek van de product owner staan ze standaard
+      // NIET in de export (wel altijd in de preview) — via de toggle
+      // "exportExtraColumns" zijn ze er alsnog bij te zetten.
       const includeExtra = exportExtraColumns.checked;
-      const filteredOutputColumns = includeExtra
-        ? outputColumns
-        : outputColumns.filter(c => c.label !== 'Urn');
       const computedColumns = referenceDataReady ? [
-        { label: 'Vulgraad', header: null, isFillColumn: true },
-        { label: 'Restruimte', header: null, isRestColumn: true },
-        { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
-        { label: 'Actie', header: null, isActionColumn: true },
-        { label: 'Naar', header: null, isMoveToColumn: true },
+        { label: 'Fill Rate', header: null, isFillColumn: true },
+        { label: 'Action', header: null, isActionColumn: true },
+        { label: 'To', header: null, isMoveToColumn: true },
+        { label: 'Locations Freed', header: null, isScoreColumn: true },
+        { label: 'Remaining', header: null, isRestColumn: true },
       ] : [];
       const filteredComputedColumns = includeExtra
         ? computedColumns
-        : computedColumns.filter(c => c.label !== 'Vulgraad' && c.label !== 'Vrij te maken locaties');
-      const exportColumns = filteredOutputColumns.concat(filteredComputedColumns);
+        : computedColumns.filter(c => c.label !== 'Fill Rate' && c.label !== 'Locations Freed');
+      const exportColumns = outputColumns
+        .concat(filteredComputedColumns)
+        .concat((urnColumn && includeExtra) ? [urnColumn] : []);
       const valueFor = (row, c) => c.isFillColumn
         ? formatFillRatio(row.__cap)
         : c.isRestColumn
@@ -1189,20 +1214,19 @@
         ? formatMoveTo(row.__moveTo)
         : (c.header ? row[c.header] : '');
 
-      // Kolombreedte: Location Code/Quantity/Urn/Vulgraad/Vrij te maken
-      // locaties krijgen net genoeg breedte voor hun eigen inhoud, Product
-      // Name krijgt de rest van de ruimte — dat is de kolom die je wilt
-      // kunnen lezen zonder afkapping.
+      // Kolombreedte: de meeste kolommen krijgen net genoeg breedte voor hun
+      // eigen inhoud, Product Name krijgt de rest van de ruimte — dat is de
+      // kolom die je wilt kunnen lezen zonder afkapping.
       const WIDTH_CAPS = {
         'Location Code': { min: 12, max: 22 },
         'Quantity': { min: 8, max: 12 },
         'Urn': { min: 12, max: 20 },
         'Product Name': { min: 40, max: 90 },
-        'Vulgraad': { min: 10, max: 12 },
-        'Restruimte': { min: 11, max: 14 },
-        'Vrij te maken locaties': { min: 12, max: 22 },
-        'Actie': { min: 8, max: 12 },
-        'Naar': { min: 12, max: 22 },
+        'Fill Rate': { min: 10, max: 12 },
+        'Remaining': { min: 11, max: 14 },
+        'Locations Freed': { min: 12, max: 18 },
+        'Action': { min: 8, max: 12 },
+        'To': { min: 12, max: 22 },
       };
       sheet.columns = exportColumns.map(c => {
         const cap = WIDTH_CAPS[c.label] || { min: 12, max: 30 };
