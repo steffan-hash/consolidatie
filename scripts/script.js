@@ -535,10 +535,20 @@
   }
 
   // Consolidatiepotentieel: hoeveel pallets heeft een artikel minimaal nodig?
-  // We vullen de volste pallets eerst en tellen hun capaciteit op tot de
-  // totale hoeveelheid erin past. Het aantal pallets dat dan overblijft is het
-  // aantal locaties dat daadwerkelijk vrijgemaakt kan worden — de kernmaat van
-  // deze tool (zie doel bovenaan: europallet-plekken vrijmaken vóór de piek).
+  // We vullen de volste pallets eerst (zelfde volgorde als
+  // computeConsolidationActions — zie daar) en tellen hun capaciteit op tot
+  // de totale hoeveelheid erin past. Het aantal pallets dat dan overblijft is
+  // het aantal locaties dat daadwerkelijk vrijgemaakt kan worden — de
+  // kernmaat van deze tool (zie doel bovenaan: europallet-plekken vrijmaken
+  // vóór de piek).
+  //
+  // Bewust NIET op capaciteit gesorteerd (wat theoretisch de minste pallets
+  // zou opleveren): dat botste met de praktische "minste ritten"-regel van
+  // computeConsolidationActions, die de volste pallets behoudt. Op de echte
+  // export gaf dat een verschil van 902 vs. 848 daadwerkelijk vrij te maken
+  // pallets — een overschatting van de haalbare capaciteit met ~6%. Dit
+  // getal moet het HAALBARE aantal zijn, dus dezelfde regel als de actie die
+  // de tool ook echt aanbeveelt.
   //
   // Vereist dat __cap al op alle baseRows staat (zie applyFilter). Artikelen
   // waarvan ook maar één pallet een onbekende capaciteit heeft krijgen géén
@@ -561,22 +571,20 @@
       if (totalQty <= 0) return;
 
       // Per pallet (Urn) rekenen, niet per regel: staat hetzelfde artikel met
-      // twee regels op dezelfde pallet, dan is dat één pallet-plek.
-      const pallets = groupByUrn(rows, urnHeader);
-
-      // Grootste capaciteiten eerst: zo hebben we de minste pallets nodig.
-      const capacities = Array.from(pallets.values()).map(p => p.capacity).sort((a, b) => b - a);
+      // twee regels op dezelfde pallet, dan is dat één pallet-plek. Volste
+      // pallet (huidige hoeveelheid) eerst — zie uitleg hierboven.
+      const pallets = Array.from(groupByUrn(rows, urnHeader).values()).sort((a, b) => b.qty - a.qty);
       let verzameld = 0;
       let minPalletsNeeded = 0;
-      for (const cap of capacities) {
+      for (const pallet of pallets) {
         if (verzameld >= totalQty) break;
-        verzameld += cap;
+        verzameld += pallet.capacity;
         minPalletsNeeded++;
       }
       minPalletsNeeded = Math.max(1, minPalletsNeeded);
 
-      const locationsFreed = Math.max(0, pallets.size - minPalletsNeeded);
-      scores.set(product, { minPalletsNeeded, locationsFreed, currentPallets: pallets.size });
+      const locationsFreed = Math.max(0, pallets.length - minPalletsNeeded);
+      scores.set(product, { minPalletsNeeded, locationsFreed, currentPallets: pallets.length });
     });
 
     return scores;

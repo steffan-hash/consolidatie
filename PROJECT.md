@@ -227,14 +227,25 @@ zonder de browserconsole nodig te hebben. (Bij het laden logt de tool ook een
 samenvatting in de console, F12 → Console.)
 
 **Fase 3 — Vrij te maken plekken (gebouwd, 3.0)**
-Per artikel wordt bepaald hoeveel pallets er minimaal nodig zijn: capaciteiten
-van groot naar klein optellen tot de totale hoeveelheid erin past. Het
-verschil met het huidige aantal pallets is **"Vrij te maken locaties"** — de
-kernmaat van de tool. Er wordt per **pallet (Urn)** gerekend, niet per regel,
-zodat een artikel met twee regels op dezelfde pallet niet dubbel telt.
-Artikelen waarvan ook maar één pallet een onbekende capaciteit heeft krijgen
-géén score: dan is niet aan te tonen dat het echt in minder pallets past.
-Dit is ook de sortering van het resultaat (meeste winst bovenaan).
+Per artikel wordt bepaald hoeveel pallets er minimaal nodig zijn: **volste
+pallet (huidige hoeveelheid) eerst**, hun capaciteit optellen tot de totale
+hoeveelheid erin past. Het verschil met het huidige aantal pallets is
+**"Locations Freed"** — de kernmaat van de tool. Er wordt per **pallet
+(Urn)** gerekend, niet per regel, zodat een artikel met twee regels op
+dezelfde pallet niet dubbel telt. Artikelen waarvan ook maar één pallet een
+onbekende capaciteit heeft krijgen géén score: dan is niet aan te tonen dat
+het echt in minder pallets past. Dit is ook de sortering van het resultaat
+(meeste winst bovenaan).
+
+**Let op: bewust niet op capaciteit gesorteerd.** Sorteren op *capaciteit*
+(grootste pallets behouden) geeft theoretisch het laagst mogelijke aantal
+pallets, maar botst met de praktische "minste ritten"-regel van Fase 4 (die
+de *volste* pallets behoudt). Op de echte export gaf dat een verschil van
+902 (capaciteit-optimaal) tegen 848 (daadwerkelijk haalbaar) — de tool
+overschatte de vrij te maken capaciteit met ~6%. Omdat deze tool voor harde
+capaciteitsplanning vóór de piek gebruikt wordt, is gekozen voor het
+**haalbare** aantal: dezelfde sortering als Fase 4, zodat deze kernmaat
+altijd exact overeenkomt met wat de Actie-kolom ook echt aanbeveelt.
 
 **Fase 4 — Werklijst voor de reachers (gebouwd, 3.0)**
 Per pallet wordt intern bepaald wat ermee moet gebeuren: leeghalen (Empty,
@@ -280,13 +291,17 @@ regels) gedraaid, want er staat geen Node/Python op deze machine. Uitkomsten:
 | Regels op Bulk Location | 6316 (738 verpakkingsmateriaal genegeerd) |
 | Unieke artikelen | 2021, waarvan 815 op 2+ pallets |
 | Capaciteit bekend | 6080 van 6316 = **96%** |
-| **Vrij te maken pallet-plekken** | **926** |
-| Pallets leeghalen daarvoor | 843, over 444 artikelen |
-| Pallets al vol (100%) | 2926 — vallen correct uit de lijst |
+| **Vrij te maken pallet-plekken (haalbaar)** | **848** |
+| Pallets leeghalen daarvoor | 848, over 422 artikelen |
 | Zelfcorrectie aangeslagen | 1398 pallets (23%) |
 | Overhang aangenomen (1 laag) | 405 pallets |
 | Onbetrouwbare productafmetingen | 96 regels (1,5%), 49 artikelen |
 | Gemengde pallets | 0 |
+
+(Cijfers hierboven zijn de eindstand ná alle fixes van 25/26-08 — overhang op
+1 laag, Keep-regels eruit, en de score consistent gemaakt met het haalbare
+aantal. Tussenstanden tijdens het uitzoeken, zoals 926/843, staan in
+`Log.md`.)
 
 Grootste vondst: **Ondertegels zwembad grijs** (23 vrij te maken plekken) en
 **blauw** (23), gevolgd door Bestway Filter Cartridge (22). Bij de eerste
@@ -299,10 +314,12 @@ laag bij overhang (zie hierboven), waarna deze kans terecht verdween.
 **Bevestigd in een echte browser (26-08-2026).** De tool is end-to-end getest
 in headless Chrome (lokale server + Chrome DevTools Protocol, want er staat
 geen Node/Python op deze machine): pagina laadt foutloos, referentiedata
-laadt met exact dezelfde aantallen als de offline-berekening, en na het
-uploaden van de echte export toonde de UI **926 vrij te maken pallet-plekken,
-848 pallets leeghalen, 677/848 met een concrete "Naar"-locatie** — in lijn
-met de eerdere doorrekening. Layout, statistieken, Actie/Naar-kolommen en het
+laadt met exact dezelfde aantallen als de offline-berekening. Na het
+uploaden van de echte export toonde de UI aanvankelijk **926 vrij te maken
+pallet-plekken** tegenover **848 pallets leeghalen** — een reëel verschil
+tussen het capaciteit-optimale en het praktisch haalbare aantal (zie Fase 3
+hierboven). Na de fix zijn beide **848**, exact gelijk, met 677/848 met een
+concrete "To"-locatie. Layout, statistieken, Action/To-kolommen en het
 lichte thema zijn met screenshots visueel gecontroleerd en correct bevonden.
 
 ## Nog open / bewust geparkeerd
