@@ -76,9 +76,14 @@
           er minimaal nodig zijn (vul de volste pallets, tel hun capaciteit op
           tot de totale hoeveelheid erin past). Het verschil met het huidige
           aantal pallets is kolom "Locations Freed". De pallets die
-          overblijven krijgen actie "Empty" (leeghalen, minst erop = eerst),
-          de rest "Keep". Kolom "Remaining" laat zien hoeveel stuks er nog
-          bij kunnen — dat is het getal waar een chauffeur iets mee kan.
+          overblijven krijgen intern actie "behouden" (Keep) — die pallets
+          vragen zelf geen actie en worden NIET meer getoond in preview/
+          export, op verzoek van de product owner (zie applyFilter). Alleen
+          de "Empty"-pallets (leeghalen, minst erop = eerst) staan in de
+          lijst; hun bestemming staat in kolom "To" en verwijst naar zo'n
+          behouden pallet, die zo impliciet zichtbaar blijft. Kolom
+          "Remaining" laat zien hoeveel stuks er nog bij kunnen op een
+          Empty-pallet — dat is het getal waar een chauffeur iets mee kan.
 
   Van→naar (3.0): kolom "To" wijst voor een "Empty"-pallet een concrete
           bestemming aan — maar alleen als de hele inhoud in één keer bij één
@@ -916,10 +921,19 @@
     computeConsolidationActions(resultRows, productHeader, urnHeader);
     computeVanNaarMoves(resultRows, productHeader, urnHeader, locationHeader);
 
+    // "Keep"-pallets (behouden) zijn puur informatief — ze vragen geen actie,
+    // want ze blijven gewoon staan. Op verzoek van de product owner worden ze
+    // niet meer getoond: de lijst bevat dan alleen nog regels die daadwerkelijk
+    // iets vragen van de chauffeur (Empty, of onbekend als dat niet te bepalen
+    // was). De bestemming van een Empty-pallet (kolom "To") verwijst nog
+    // steeds naar de behouden pallet — die blijft dus impliciet zichtbaar,
+    // alleen niet meer als eigen regel met zijn eigen aantal/vulgraad.
+    resultRows = resultRows.filter(row => row.__action !== 'behouden');
+
     // Sorteren op consolidatiewinst (meeste vrij te maken locaties bovenaan),
     // dan op product (zodat alle pallets van hetzelfde artikel bij elkaar
-    // staan), dan op actie (Empty vóór Keep — dat is de daadwerkelijke
-    // werkvoorraad), en pas daarna op hoeveelheid en locatie voor een
+    // staan), dan op actie (Empty vóór onbekend — Keep-regels zijn hierboven
+    // al weggefilterd), en pas daarna op hoeveelheid en locatie voor een
     // voorspelbare volgorde. Artikelen zonder bekende score (-1) staan onderaan.
     const ACTION_ORDER = { legen: 0, behouden: 1, onbekend: 2 };
     resultRows = resultRows.slice().sort((a, b) => {
@@ -1004,7 +1018,7 @@
       if (toEmptyCount) {
         const withTarget = resultRows.filter(r => r.__action === 'legen' && r.__moveTo).length;
         stats.push({
-          label: 'Waarvan met concrete "Naar"-locatie',
+          label: 'Waarvan met concrete "To"-locatie',
           num: `${withTarget} / ${toEmptyCount}`,
         });
       }

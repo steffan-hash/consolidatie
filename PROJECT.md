@@ -237,13 +237,19 @@ géén score: dan is niet aan te tonen dat het echt in minder pallets past.
 Dit is ook de sortering van het resultaat (meeste winst bovenaan).
 
 **Fase 4 — Werklijst voor de reachers (gebouwd, 3.0)**
-Kolom **Actie** geeft per pallet aan wat er moet gebeuren: **Empty**
-(leeghalen, voorraad overhevelen) of **Keep** (blijft staan, ontvangt de
-voorraad). De pallets met het **meeste** erop blijven staan — dat kost de
-minste ritten — en worden aangevuld tot de totale hoeveelheid erin past; wat
-dan overblijft kan leeg. Binnen elk artikel staan de Empty-pallets bovenaan.
-De labels blijven Engels (kort en duidelijk voor de chauffeurs), de rest van
-de tool is Nederlands.
+Per pallet wordt intern bepaald wat ermee moet gebeuren: leeghalen (Empty,
+voorraad overhevelen) of blijven staan (Keep, ontvangt de voorraad). De
+pallets met het **meeste** erop blijven staan — dat kost de minste ritten —
+en worden aangevuld tot de totale hoeveelheid erin past; wat dan overblijft
+wordt leeggehaald.
+
+**Keep-pallets worden niet getoond.** Op verzoek van de product owner staan
+alleen de Empty-regels in de preview en de export — Keep-pallets vragen zelf
+geen actie, dus een eigen regel voor "deze pallet blijft gewoon staan" voegt
+niets toe. Hun locatie blijft wel impliciet zichtbaar: de kolom **To** van
+een Empty-regel verwijst er direct naartoe. Getest op de echte export:
+"Regels in huidig resultaat" en "Pallets leeghalen" zijn nu exact gelijk
+(848 = 848), en de Action-kolom bevat uitsluitend "Empty" — geen Keep meer.
 
 **Fase 4b — Van→naar-koppeling (gebouwd, 3.0, proof of concept eerst getoetst)**
 Kolom **Naar** wijst voor een "Empty"-pallet een concrete bestemming aan: de
