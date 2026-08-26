@@ -66,6 +66,10 @@ format.
 - **Getest in de browser:** alle drie de cijfers zijn nu gelijk — "Vrij te maken pallet-plekken" = "Pallets leeghalen om dat te bereiken" = "Regels in huidig resultaat" = 848 (was 902/848/848).
 - `PROJECT.md` bijgewerkt: Fase 3 beschrijft nu de volste-pallet-eerst-regel met uitleg waarom (met de 902-vs-848-vondst als onderbouwing), en de testresultaten-tabel/paragraaf zijn bijgewerkt naar de definitieve, consistente cijfers (926/843 waren tussenstanden, nu overal 848).
 
+**Vervolg dezelfde sessie — stijlgids voor een collega:**
+- Een collega wil de visuele stijl van deze webapp overnemen voor een ander project. Er bestond geen los stijldocument — de stijl stond alleen impliciet in `index.html` (Tailwind-config) en in de door `script.js` gegenereerde HTML.
+- Nieuw bestand `STYLE.md`: overdraagbare stijlreferentie met het fundament (Tailwind via CDN, Inter, shadcn-achtige richting, zinc-grijsschaal, geel accent, donker thema via `localStorage` + `darkMode:'class'`), de complete Tailwind-config om over te nemen, en alle terugkerende classpatronen (kaart, knoppen, tabel, statistiektegel, meldingsbalken, checkbox) met een korte toelichting per patroon. Losstaand van `PROJECT.md`, want dit is bedoeld om mee te nemen naar een ander project, niet als documentatie van dít project.
+
 ## Sessie 2026-08-25
 **Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.
 
