@@ -68,11 +68,14 @@ start index.html
 - **Consolidatie-kandidaat** = een artikel dat op 2 of meer unieke pallets
   (verschillende `Urn`-waarden) op een Bulk Location staat. Artikelen op
   precies 1 pallet worden standaard verborgen (instelbaar via checkbox).
-- Het exportbestand bevat 4 vaste kolommen uit de bron (niet instelbaar):
-  Location Code, Product Name (= `Description` uit de bron), Quantity, Urn —
-  de rest van de brondata is ruis voor het fysiek consolideren van pallets.
-  Daarnaast 4 berekende kolommen: Vulgraad, Restruimte, Vrij te maken
-  locaties en Actie (zie Model 3.0).
+- Het exportbestand bevat standaard 6 kolommen: Location Code, Product Name
+  (= `Description` uit de bron), Quantity, Restruimte, Actie en Naar. **Urn,
+  Vulgraad en Vrij te maken locaties staan er bewust niet in** — met alle 9
+  kolommen paste de export niet meer op 1 A4 liggend. Deze 3 blijven altijd
+  gewoon zichtbaar in de preview-tabel; een toggle ("Urn, Vulgraad en Vrij te
+  maken locaties ook meenemen in de export", standaard uit) zet ze er in de
+  export weer bij. Getest: zonder toggle 6 kolommen/105 KB, met toggle 9
+  kolommen/150 KB, printopmaak blijft in beide gevallen 1 pagina breed.
 - Resultaat wordt gesorteerd op vrij te maken locaties (meeste winst
   bovenaan), dan op product zodat alle pallets van hetzelfde artikel bij
   elkaar staan, en binnen een artikel op hoeveelheid oplopend — zodat de

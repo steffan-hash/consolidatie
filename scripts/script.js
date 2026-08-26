@@ -91,6 +91,12 @@
           consolidatie tot tientallen losse regels van een paar stuks — niet
           uitvoerbaar voor een chauffeur. Zie computeVanNaarMoves().
 
+  Exportkolommen (3.0): de export paste niet meer op 1 A4 liggend met alle
+          kolommen erbij. Urn, Vulgraad en Vrij te maken locaties staan
+          daarom standaard NIET in het geëxporteerde bestand — wel altijd in
+          de preview-tabel. Een toggle ("exportExtraColumns") zet ze er op
+          verzoek weer bij.
+
   Zoekfilter: een zoekveld boven de resultaattabel filtert op de zichtbare
           kolommen (Location Code, Product Name, Quantity, Urn). Werkt als
           laatste stap ná de score/actie-berekening, zodat zoeken naar 1
@@ -136,6 +142,7 @@
   const statusEl = document.getElementById('status');
   const previewTable = document.getElementById('previewTable');
   const exportBtn = document.getElementById('exportBtn');
+  const exportExtraColumns = document.getElementById('exportExtraColumns');
   const refDataHint = document.getElementById('refDataHint');
 
   // Thema-knop rechtsboven: wisselt de "dark" class op <html> (waar
@@ -1150,15 +1157,26 @@
       // De 4 vaste brondkolommen, plus Vulgraad, Vrij te maken locaties
       // (Fase 3) en Actie (Fase 4) als berekende kolommen — maar alleen als
       // de referentiedata geladen kon worden.
-      const exportColumns = outputColumns.concat(
-        referenceDataReady ? [
-          { label: 'Vulgraad', header: null, isFillColumn: true },
-          { label: 'Restruimte', header: null, isRestColumn: true },
-          { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
-          { label: 'Actie', header: null, isActionColumn: true },
-          { label: 'Naar', header: null, isMoveToColumn: true },
-        ] : []
-      );
+      //
+      // Urn, Vulgraad en Vrij te maken locaties staan altijd in de preview,
+      // maar duwden de export over de rand van 1 A4 liggend. Op verzoek van
+      // de product owner staan ze standaard NIET in de export — via de
+      // toggle "exportExtraColumns" zijn ze er alsnog bij te zetten.
+      const includeExtra = exportExtraColumns.checked;
+      const filteredOutputColumns = includeExtra
+        ? outputColumns
+        : outputColumns.filter(c => c.label !== 'Urn');
+      const computedColumns = referenceDataReady ? [
+        { label: 'Vulgraad', header: null, isFillColumn: true },
+        { label: 'Restruimte', header: null, isRestColumn: true },
+        { label: 'Vrij te maken locaties', header: null, isScoreColumn: true },
+        { label: 'Actie', header: null, isActionColumn: true },
+        { label: 'Naar', header: null, isMoveToColumn: true },
+      ] : [];
+      const filteredComputedColumns = includeExtra
+        ? computedColumns
+        : computedColumns.filter(c => c.label !== 'Vulgraad' && c.label !== 'Vrij te maken locaties');
+      const exportColumns = filteredOutputColumns.concat(filteredComputedColumns);
       const valueFor = (row, c) => c.isFillColumn
         ? formatFillRatio(row.__cap)
         : c.isRestColumn

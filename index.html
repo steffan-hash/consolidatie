@@ -133,7 +133,14 @@
         <div id="previewWrap" class="max-h-[420px] overflow-auto border border-zinc-200 dark:border-zinc-700 rounded-lg mt-3.5">
           <table id="previewTable" class="w-full border-collapse text-sm"></table>
         </div>
-        <button id="exportBtn" class="w-full inline-flex items-center justify-center h-9 bg-accent hover:bg-accentdark disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed text-zinc-900 font-medium text-sm px-4 rounded-md mt-3 transition-colors cursor-pointer">Download resultaat als .xlsx</button>
+        <label class="flex items-center gap-2.5 cursor-pointer text-sm font-medium mt-3.5">
+          <input type="checkbox" id="exportExtraColumns" class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 accent-[#eab627]" />
+          Urn, Vulgraad en Vrij te maken locaties ook meenemen in de export
+        </label>
+        <div class="text-zinc-500 dark:text-zinc-400 text-xs mt-1 mb-1">
+          Staat uit zodat de export op 1 A4 liggend past. Deze kolommen blijven altijd zichtbaar in de tabel hierboven.
+        </div>
+        <button id="exportBtn" class="w-full inline-flex items-center justify-center h-9 bg-accent hover:bg-accentdark disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed text-zinc-900 font-medium text-sm px-4 rounded-md mt-2 transition-colors cursor-pointer">Download resultaat als .xlsx</button>
       </div>
     </div>
   </div>

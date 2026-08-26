@@ -33,9 +33,17 @@ format.
 - **Visueel gecontroleerd met screenshots** (viewport vergroot naar 1600px breed voor de 2-koloms desktop-layout): resultaattabel, statistieken, de nieuwe checkbox "Alleen echte kansen tonen", de kolommen Actie (met het gele accent op "Empty") en Naar (met "-" bij pallets zonder schone match), en het lichte thema — allemaal correct en leesbaar.
 - Chrome en de lokale server na afloop weer afgesloten.
 
+**Wat gedaan — export teruggebracht naar 1 A4 liggend:**
+- Product owner meldde dat de export niet meer op 1 A4 paste sinds de nieuwe kolommen (Restruimte, Actie, Naar) erbij kwamen. Gevraagd om Urn, Vulgraad en Vrij te maken locaties uit de export te halen — wel gewoon zichtbaar laten in de webapp — eventueel met een toggle.
+- `index.html`: nieuwe checkbox "Urn, Vulgraad en Vrij te maken locaties ook meenemen in de export" onder de resultaattabel, standaard uit.
+- `scripts/script.js`: de exportfunctie filtert deze 3 kolommen er nu standaard uit (`exportExtraColumns`-toggle bepaalt of ze meegaan); de preview-tabel is niet aangeraakt en toont ze nog steeds altijd.
+- **Getest in de browser** (dezelfde CDP-opstelling als hierboven, plus `Browser.setDownloadBehavior` om de gedownloade .xlsx-bestanden op te vangen en met Excel COM na te lezen): zonder toggle 6 kolommen (Location Code, Product Name, Quantity, Restruimte, Actie, Naar), met toggle alle 9. Printopmaak blijft in beide gevallen 1 pagina breed.
+- `PROJECT.md` bijgewerkt.
+
 **Nog open:**
 - De 33% zonder concrete "Naar" is nog steeds "Empty" zonder instructie. Niet gevraagd of dat later alsnog moet (bijv. met een cap van 2-3 ontvangers) — voor nu bewust zo gelaten.
 - Overwegen: deze testopstelling (statische server + CDP-aansturing via PowerShell) vastleggen als project-skill (`/run-skill-generator`), zodat een volgende sessie de tool niet opnieuw vanaf nul hoeft op te zetten om te testen.
+- Niet visueel gecontroleerd of de export met 6 kolommen ook daadwerkelijk prettig oogt op een uitgeprinte/PDF-A4 (alleen de paginabreedte-instelling en kolomkeuze zijn bevestigd) — pas dat als eerste beoordeeld kan worden op een echte printer/PDF-export.
 
 ## Sessie 2026-08-25
 **Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.
