@@ -468,7 +468,15 @@
     if (laag.perLaag <= 0) return { reason: 'past-niet-op-pallet' };
     if (laag.overhang) overhangAssumedCount++;
 
-    const lagen = Math.floor(stapelHoogte / product.height);
+    // Bij overhang (het artikel steekt over de rand) nemen we maar 1 laag aan,
+    // ongeacht hoeveel er volgens de hoogte-deling zou passen. Overstekende
+    // artikelen meerdere lagen hoog stapelen is niet stabiel — bevestigd door
+    // de product owner na het hangstoel-voorbeeld (5-6 lagen hoog gestapelde
+    // overhangende stoelen is niet realistisch). Dit is dus geen rekenkundige
+    // aanname maar een expliciete praktijkregel.
+    const lagen = laag.overhang
+      ? (product.height <= stapelHoogte ? 1 : 0)
+      : Math.floor(stapelHoogte / product.height);
     if (lagen <= 0) return { reason: 'product-te-hoog' };
 
     const berekend = laag.perLaag * lagen;

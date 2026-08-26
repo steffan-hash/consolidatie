@@ -4,6 +4,21 @@ Dit bestand wordt door Claude bijgehouden, niet handmatig door de product
 owner. Nieuwste sessie bovenaan. Zie CLAUDE.md → "Sessie einde" voor het
 format.
 
+## Sessie 2026-08-26
+**Status:** Korte sessie, vervolg op de model 3.0-test van gisteren. Drie punten van de product owner afgehandeld: de hangstoel-aanname is afgekeurd en gecorrigeerd, de lokale backups zijn opgeruimd, en er wordt begonnen aan een proof of concept voor de van→naar-koppeling.
+
+**Wat gedaan — overhang-aanname bijgesteld (hangstoel bleek een valse kans):**
+- Product owner bevestigde: nee, 5-6 lagen overhangende hangstoelen op elkaar stapelen is niet realistisch. Dat was precies de aanname achter de grootste kans uit de vorige sessie (40 vrij te maken locaties bij "Hangstoel Perth").
+- `scripts/script.js`: bij overhang (product past niet netjes binnen de palletvoetprint) wordt nu altijd met precies 1 laag gerekend, ongeacht hoeveel er volgens de locatiehoogte zou passen — een expliciete praktijkregel, geen rekenkundige aanname. Bij een netjes passend artikel blijft het lagenmodel (meerdere lagen) gewoon van toepassing.
+- Opnieuw getest op `data/input/voorraad_export.xlsx`: vrij te maken pallet-plekken zakte van 1011 naar **926** (843 pallets leeghalen, 444 artikelen) — de hangstoel-kans is uit de top verdwenen, zoals verwacht. Zelfcorrectie steeg van 1240 naar 1398 pallets (23%): overhangende artikelen die in werkelijkheid wél hoger gestapeld stonden dan de nieuwe, voorzichtigere 1-laag-aanname toestaat, worden nu via de waarneming gecorrigeerd i.p.v. als kans getoond.
+- `PROJECT.md` bijgewerkt: overhang-regel en de testresultaten-tabel aangepast naar de nieuwe cijfers.
+
+**Wat gedaan — opruimen:**
+- De 3 lokale backups van `locations.xlsx` (24-08 en 25-08, nooit in git) verwijderd op uitdrukkelijk verzoek van de product owner. De originele versies staan toch al in de git-historie.
+
+**Nog open:**
+- Proof of concept voor de van→naar-koppeling — zie hieronder, wordt deze sessie opgepakt.
+
 ## Sessie 2026-08-25
 **Status:** Grote sessie met een koerswijziging. Begonnen met kleine punten (DOOS/BOX/TOP-filter en thema-knop bevestigd werkend, suffix "-35"-hoogtefix, breedte 900→800 mm, CHITA-filter, zoekveld, werklijst met Empty/Keep). Daarna gaf de product owner aan niet tevreden te zijn over het resultaat van de tool, wat leidde tot een **herontwerp van het rekenmodel: van vulgraad (volume) naar capaciteit in stuks (model 3.0)**. Oorzaak van de ontevredenheid: het volumemodel behandelde een pallet als iets dat volgegoten wordt i.p.v. gestapeld, waardoor volle pallets als halfleeg werden aangemerkt.
 

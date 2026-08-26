@@ -154,15 +154,19 @@ pallets, en dus het aantal vrij te maken plekken.
   die zegt welke pallet er wérkelijk staat, terwijl `locations.xlsx` zegt waar
   de locatie voor bedoeld is. Gemeten op een echte export verschillen die in
   512 van 6310 regels (o.a. 221 blokpallets op europallet-plekken).
-- **Overhang is toegestaan.** Past een artikel niet netjes binnen de
-  palletvoetprint, maar is het grondoppervlak niet meer dan 2× het
-  palletoppervlak (`OVERHANG_MAX_AREA_FACTOR`), dan rekent de tool met 1 stuk
-  per laag. Zonder die regel viel 7% van de regels weg als "past niet" —
-  waaronder een hangstoel van 940×940 mm op een europallet (staat er in de
+- **Overhang is toegestaan, maar dan maximaal 1 laag.** Past een artikel niet
+  netjes binnen de palletvoetprint, maar is het grondoppervlak niet meer dan
+  2× het palletoppervlak (`OVERHANG_MAX_AREA_FACTOR`), dan rekent de tool met
+  1 stuk per laag. Zonder die regel viel 7% van de regels weg als "past niet"
+  — waaronder een hangstoel van 940×940 mm op een europallet (staat er in de
   praktijk gewoon op) en een spacover van 2400×1210 mm op een 270-pallet van
-  2700×1200 (10 mm te breed op papier). 1 per laag is de laagst mogelijke
-  aanname, dus dit kan de capaciteit alleen onderschatten — nooit een valse
-  kans opleveren. Echt buitenmaatse artikelen blijven "past niet op pallet".
+  2700×1200 (10 mm te breed op papier).
+  **Bevestigd door de product owner: overhangende artikelen meerdere lagen
+  hoog stapelen is niet realistisch** (getoetst aan het hangstoel-voorbeeld,
+  dat op basis van 5-6 lagen 40 vrij te maken locaties leek op te leveren —
+  dat bleek dus een valse kans). Bij overhang wordt daarom altijd met precies
+  1 laag gerekend, ongeacht de locatiehoogte. Bij een netjes passend artikel
+  blijft het lagenmodel wel gewoon van toepassing.
 - **Referentiedata wordt eerst gewantrouwd** (plausibiliteitstoets). Producten
   met 1×1×1, ontbrekende, absurd kleine of absurd grote afmetingen worden
   afgekeurd; locaties met een onmogelijke hoogte of onbekende palletsoort ook.
@@ -240,18 +244,21 @@ regels) gedraaid, want er staat geen Node/Python op deze machine. Uitkomsten:
 | Regels op Bulk Location | 6316 (738 verpakkingsmateriaal genegeerd) |
 | Unieke artikelen | 2021, waarvan 815 op 2+ pallets |
 | Capaciteit bekend | 6080 van 6316 = **96%** |
-| **Vrij te maken pallet-plekken** | **1011** |
-| Pallets leeghalen daarvoor | 935, over 473 artikelen |
-| Pallets al vol (100%) | 2662 — vallen correct uit de lijst |
-| Zelfcorrectie aangeslagen | 1240 pallets (20%) |
-| Overhang aangenomen | 405 pallets |
+| **Vrij te maken pallet-plekken** | **926** |
+| Pallets leeghalen daarvoor | 843, over 444 artikelen |
+| Pallets al vol (100%) | 2926 — vallen correct uit de lijst |
+| Zelfcorrectie aangeslagen | 1398 pallets (23%) |
+| Overhang aangenomen (1 laag) | 405 pallets |
 | Onbetrouwbare productafmetingen | 96 regels (1,5%), 49 artikelen |
 | Gemengde pallets | 0 |
 
-Grootste vondst: **Hangstoel "Perth"** staat op 49 pallets met steeds 1 stuk
-erop, terwijl er 5 à 6 op een pallet passen — 9 pallets zouden genoeg zijn,
-dus **40 plekken vrij uit één artikel**. Dat is precies het soort kans dat het
-oude volumemodel niet kon vinden.
+Grootste vondst: **Ondertegels zwembad grijs** (23 vrij te maken plekken) en
+**blauw** (23), gevolgd door Bestway Filter Cartridge (22). Bij de eerste
+doorrekening kwam "Hangstoel Perth" bovenaan met 40 plekken (49 pallets met 1
+stuk erop, terwijl er volgens de berekening 5-6 op een pallet zouden passen).
+De product owner bevestigde dat meerdere lagen van een overstekend artikel
+stapelen niet realistisch is — daarom is de aanname bijgesteld naar precies 1
+laag bij overhang (zie hierboven), waarna deze kans terecht verdween.
 
 Nog niet in een echte browser bekeken (alleen de rekenkant is getoetst).
 
